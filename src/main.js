@@ -1,8 +1,11 @@
 // VaaniSewa - Voice Accessibility App
 class VaaniSewaApp {
     constructor() {
+        this.auth = new AuthSystem();
+        this.adminDashboard = null;
+        this.userDashboard = null;
         this.currentLanguage = localStorage.getItem('vaanisewa-language') || 'en';
-        this.currentUser = JSON.parse(localStorage.getItem('vaanisewa-user')) || null;
+        this.currentUser = this.auth.currentUser;
         this.currentScreen = 'welcome';
         this.isListening = false;
         this.recognition = null;
@@ -159,16 +162,50 @@ class VaaniSewaApp {
         this.updateVolumeDisplay();
         this.updateSpeechSettings();
         
-        // Show appropriate screen based on login status
-        if (this.currentUser) {
-            this.showScreen('dashboard');
-            this.updateUserInfo();
+        // Initialize dashboards based on user role
+        if (this.auth.currentUser) {
+            this.currentUser = this.auth.currentUser;
+            this.initializeDashboards();
         } else {
             this.showScreen('welcome');
         }
 
         // Start listening for voice commands
         this.startListening();
+        
+        // Setup session management
+        this.setupSessionManagement();
+    }
+
+    initializeDashboards() {
+        if (this.auth.hasRole('admin') || this.auth.hasRole('institution_admin')) {
+            this.adminDashboard = new AdminDashboard(this.auth);
+            this.showScreen('admin');
+        } else {
+            this.userDashboard = new UserDashboard(this.auth);
+            this.showScreen('user');
+        }
+    }
+
+    setupSessionManagement() {
+        // Listen for session expiration
+        window.addEventListener('sessionExpired', () => {
+            this.speak('Your session has expired. Please log in again.');
+            this.logout();
+        });
+        
+        // Update activity on user interaction
+        document.addEventListener('click', () => {
+            if (this.auth.currentUser) {
+                this.auth.updateLastActivity();
+            }
+        });
+        
+        document.addEventListener('keydown', () => {
+            if (this.auth.currentUser) {
+                this.auth.updateLastActivity();
+            }
+        });
     }
 
     setupVoiceRecognition() {
@@ -196,6 +233,10 @@ class VaaniSewaApp {
                 const lastResult = event.results[event.results.length - 1];
                 if (lastResult.isFinal) {
                     const command = lastResult[0].transcript.toLowerCase().trim();
+                    // Log voice command activity
+                    if (this.auth.currentUser) {
+                        this.auth.logActivity('voice_command', { command });
+                    }
                     this.processVoiceCommand(command);
                 }
             };
@@ -245,7 +286,7 @@ class VaaniSewaApp {
         });
 
         document.getElementById('logoutBtn').addEventListener('click', () => {
-            this.logout();
+            this.handleLogout();
         });
 
         // Form submissions
@@ -256,7 +297,7 @@ class VaaniSewaApp {
 
         document.getElementById('loginForm').addEventListener('submit', (e) => {
             e.preventDefault();
-            this.handleLogin();
+            this.handleLoginWithRole();
         });
 
         // Cancel buttons
@@ -494,24 +535,26 @@ class VaaniSewaApp {
             return;
         }
 
-        // Save user data
-        const userData = {
-            username,
-            email,
-            disability,
-            registeredAt: new Date().toISOString()
-        };
-
-        localStorage.setItem('vaanisewa-user', JSON.stringify(userData));
-        this.currentUser = userData;
+        // Register user with default student role
+        const result = this.auth.login(username, 'default_password', 'student');
+        
+        if (result.success) {
+            // Update user with registration data
+            const updatedUser = {
+                ...result.user,
+                email,
+                disability
+            };
+            this.auth.updateUser(updatedUser);
+            this.currentUser = updatedUser;
+        }
 
         this.speak(this.translations[this.currentLanguage].registrationSuccess, () => {
-            this.showScreen('dashboard');
-            this.updateUserInfo();
+            this.initializeDashboards();
         });
     }
 
-    handleLogin() {
+    handleLoginWithRole() {
         const username = document.getElementById('loginUsername').value.trim();
 
         if (!username) {
@@ -519,25 +562,39 @@ class VaaniSewaApp {
             return;
         }
 
-        // Check if user exists
-        const savedUser = JSON.parse(localStorage.getItem('vaanisewa-user'));
-        if (!savedUser || savedUser.username !== username) {
+        // Determine role based on username pattern (for demo)
+        let role = 'student';
+        if (username.includes('admin')) {
+            role = 'admin';
+        } else if (username.includes('institution')) {
+            role = 'institution_admin';
+        }
+        
+        const result = this.auth.login(username, 'default_password', role);
+        
+        if (!result.success) {
             this.speak(this.translations[this.currentLanguage].userNotFound);
             return;
         }
 
-        this.currentUser = savedUser;
+        this.currentUser = result.user;
         this.speak(this.translations[this.currentLanguage].loginSuccess, () => {
-            this.showScreen('dashboard');
-            this.updateUserInfo();
+            this.initializeDashboards();
         });
     }
 
-    logout() {
+    handleLogout() {
+        this.auth.logout();
         this.currentUser = null;
+        this.adminDashboard = null;
+        this.userDashboard = null;
         this.speak(this.translations[this.currentLanguage].logoutSuccess, () => {
             this.showScreen('welcome');
         });
+    }
+    
+    logout() {
+        this.handleLogout();
     }
 
     showScreen(screenName) {
@@ -547,7 +604,15 @@ class VaaniSewaApp {
         });
 
         // Show target screen
-        const targetScreen = document.getElementById(`${screenName}Screen`);
+        let targetScreen;
+        if (screenName === 'admin') {
+            targetScreen = document.getElementById('adminDashboard');
+        } else if (screenName === 'user') {
+            targetScreen = document.getElementById('userDashboard');
+        } else {
+            targetScreen = document.getElementById(`${screenName}Screen`);
+        }
+        
         if (targetScreen) {
             targetScreen.classList.add('active');
             this.currentScreen = screenName;
@@ -701,5 +766,15 @@ class VaaniSewaApp {
 
 // Initialize the app when DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
-    new VaaniSewaApp();
+    // Initialize security manager
+    window.securityManager = new SecurityManager();
+    
+    // Initialize data manager
+    window.dataManager = new DataManager(window.authSystem);
+    
+    window.vaaniSewaApp = new VaaniSewaApp();
+    
+    // Make dashboards globally accessible for event handlers
+    window.adminDashboard = window.vaaniSewaApp.adminDashboard;
+    window.userDashboard = window.vaaniSewaApp.userDashboard;
 });

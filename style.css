@@ -727,3 +727,144 @@ body {
         transition-duration: 0.01ms !important;
     }
 }
+
+/* Security and Validation Styles */
+.validation-message {
+    font-size: 0.75rem;
+    margin-top: 0.25rem;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+}
+
+.validation-message.error {
+    background: #fed7d7;
+    color: #742a2a;
+    border: 1px solid #fc8181;
+}
+
+.form-input.invalid,
+.form-select.invalid {
+    border-color: #e53e3e;
+    background: #fed7d7;
+}
+
+.password-strength {
+    margin-top: 0.5rem;
+}
+
+.strength-bar {
+    width: 100%;
+    height: 4px;
+    background: #e2e8f0;
+    border-radius: 2px;
+    overflow: hidden;
+    margin-bottom: 0.25rem;
+}
+
+.strength-fill {
+    height: 100%;
+    transition: width 0.3s ease;
+}
+
+.strength-fill.weak {
+    width: 33%;
+    background: #e53e3e;
+}
+
+.strength-fill.medium {
+    width: 66%;
+    background: #ed8936;
+}
+
+.strength-fill.strong {
+    width: 100%;
+    background: #38a169;
+}
+
+.strength-text {
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+.strength-text.weak {
+    color: #e53e3e;
+}
+
+.strength-text.medium {
+    color: #ed8936;
+}
+
+.strength-text.strong {
+    color: #38a169;
+}
+
+.password-errors {
+    list-style: none;
+    margin: 0.5rem 0 0 0;
+    padding: 0;
+}
+
+.password-errors li {
+    font-size: 0.75rem;
+    color: #742a2a;
+    margin-bottom: 0.25rem;
+    padding-left: 1rem;
+    position: relative;
+}
+
+.password-errors li::before {
+    content: "•";
+    color: #e53e3e;
+    position: absolute;
+    left: 0;
+}
+
+.security-alert {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    background: #fed7d7;
+    border: 2px solid #e53e3e;
+    border-radius: 8px;
+    padding: 1rem;
+    max-width: 400px;
+    z-index: 1001;
+    animation: slideInRight 0.3s ease-out;
+}
+
+.alert-content {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.alert-content i {
+    color: #e53e3e;
+    font-size: 1.25rem;
+}
+
+.alert-content span {
+    flex: 1;
+    color: #742a2a;
+    font-weight: 500;
+}
+
+.alert-close {
+    background: none;
+    border: none;
+    color: #742a2a;
+    font-size: 1.25rem;
+    cursor: pointer;
+    padding: 0;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    transition: background 0.2s ease;
+}
+
+.alert-close:hover {
+    background: rgba(116, 42, 42, 0.1);
+}
