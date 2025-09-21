@@ -159,9 +159,6 @@ class VaaniSewaApp {
     }
 
     init() {
-        // Initialize help and onboarding systems first
-        this.initializeHelpSystems();
-        
         this.setupVoiceRecognition();
         this.setupEventListeners();
         this.loadVoices();
@@ -169,12 +166,20 @@ class VaaniSewaApp {
         this.updateVolumeDisplay();
         this.updateSpeechSettings();
         
+        // Initialize help and onboarding systems after DOM is ready
+        setTimeout(() => {
+            this.initializeHelpSystems();
+        }, 100);
+        
         // Initialize dashboards based on user role
         if (this.auth.currentUser) {
             this.currentUser = this.auth.currentUser;
             this.initializeDashboards();
+            this.checkOnboarding();
         } else {
             this.showScreen('welcome');
+            // Set up demo accounts
+            this.setupDemoAccounts();
         }
 
         // Start listening for voice commands
@@ -182,22 +187,127 @@ class VaaniSewaApp {
         
         // Setup session management
         this.setupSessionManagement();
-        
-        // Check if user needs onboarding
-        this.checkOnboarding();
     }
 
     initializeHelpSystems() {
-        // Initialize contextual help system
-        this.contextualHelp = new ContextualHelp(this);
+        try {
+            // Initialize contextual help system
+            if (typeof ContextualHelp !== 'undefined') {
+                this.contextualHelp = new ContextualHelp(this);
+            }
+            
+            // Initialize onboarding wizard
+            if (typeof OnboardingWizard !== 'undefined') {
+                this.onboardingWizard = new OnboardingWizard(this);
+            }
+        } catch (error) {
+            console.warn('Help systems not available:', error);
+        }
+    }
+
+    setupDemoAccounts() {
+        // Create demo accounts if they don't exist
+        const users = this.auth.getUsers();
+        const demoAccounts = [
+            {
+                id: 'demo-student-1',
+                username: 'student1',
+                email: 'student1@vaanisewa.demo',
+                role: 'student',
+                disability: 'visual',
+                isActive: true,
+                createdAt: new Date().toISOString(),
+                lastLogin: null,
+                preferences: {
+                    language: 'en',
+                    speechRate: 1.0,
+                    speechPitch: 1.0,
+                    volume: 0.7,
+                    highContrast: false,
+                    reducedMotion: false
+                }
+            },
+            {
+                id: 'demo-admin-1',
+                username: 'admin',
+                email: 'admin@vaanisewa.demo',
+                role: 'admin',
+                disability: 'other',
+                isActive: true,
+                createdAt: new Date().toISOString(),
+                lastLogin: null,
+                preferences: {
+                    language: 'en',
+                    speechRate: 1.0,
+                    speechPitch: 1.0,
+                    volume: 0.7,
+                    highContrast: false,
+                    reducedMotion: false
+                }
+            },
+            {
+                id: 'demo-institution-1',
+                username: 'institution_admin',
+                email: 'institution@vaanisewa.demo',
+                role: 'institution_admin',
+                disability: 'mobility',
+                isActive: true,
+                createdAt: new Date().toISOString(),
+                lastLogin: null,
+                preferences: {
+                    language: 'en',
+                    speechRate: 1.0,
+                    speechPitch: 1.0,
+                    volume: 0.7,
+                    highContrast: false,
+                    reducedMotion: false
+                }
+            }
+        ];
+
+        // Add demo accounts if they don't exist
+        demoAccounts.forEach(demoAccount => {
+            const existingUser = users.find(u => u.username === demoAccount.username);
+            if (!existingUser) {
+                users.push(demoAccount);
+            }
+        });
+
+        localStorage.setItem('vaanisewa-users', JSON.stringify(users));
         
-        // Initialize onboarding wizard
-        this.onboardingWizard = new OnboardingWizard(this);
+        // Show demo account info
+        this.showDemoAccountInfo();
+    }
+
+    showDemoAccountInfo() {
+        const demoInfo = document.createElement('div');
+        demoInfo.className = 'demo-info';
+        demoInfo.innerHTML = `
+            <div class="demo-info-content">
+                <h3>Demo Accounts Available</h3>
+                <ul>
+                    <li><strong>Student:</strong> username: "student1"</li>
+                    <li><strong>Admin:</strong> username: "admin"</li>
+                    <li><strong>Institution Admin:</strong> username: "institution_admin"</li>
+                </ul>
+                <p>You can also register a new account or use voice commands!</p>
+                <button onclick="this.parentElement.parentElement.remove()">Got it!</button>
+            </div>
+        `;
+        
+        document.body.appendChild(demoInfo);
+        
+        // Auto-remove after 10 seconds
+        setTimeout(() => {
+            if (demoInfo.parentElement) {
+                demoInfo.remove();
+            }
+        }, 10000);
     }
 
     checkOnboarding() {
         // Show onboarding for new users or after login
-        if (OnboardingWizard.shouldShowOnboarding() && this.auth.currentUser) {
+        if (this.onboardingWizard && OnboardingWizard.shouldShowOnboarding() && this.auth.currentUser) {
             setTimeout(() => {
                 this.onboardingWizard.start();
             }, 1000); // Delay to ensure UI is ready
@@ -247,11 +357,13 @@ class VaaniSewaApp {
             this.recognition.onstart = () => {
                 this.isListening = true;
                 this.updateListeningStatus();
+                console.log('Voice recognition started');
             };
             
             this.recognition.onend = () => {
                 this.isListening = false;
                 this.updateListeningStatus();
+                console.log('Voice recognition ended, restarting...');
                 // Restart listening after a short delay
                 setTimeout(() => this.startListening(), 1000);
             };
@@ -260,6 +372,7 @@ class VaaniSewaApp {
                 const lastResult = event.results[event.results.length - 1];
                 if (lastResult.isFinal) {
                     const command = lastResult[0].transcript.toLowerCase().trim();
+                    console.log('Voice command received:', command);
                     // Log voice command activity
                     if (this.auth.currentUser) {
                         this.auth.logActivity('voice_command', { command });
@@ -272,6 +385,11 @@ class VaaniSewaApp {
                 console.error('Speech recognition error:', event.error);
                 if (event.error === 'not-allowed') {
                     this.speak(this.translations[this.currentLanguage].microphoneError);
+                } else if (event.error === 'no-speech') {
+                    console.log('No speech detected, continuing...');
+                } else if (event.error === 'network') {
+                    console.log('Network error, retrying...');
+                    setTimeout(() => this.startListening(), 2000);
                 }
             };
         } else {
@@ -562,19 +680,42 @@ class VaaniSewaApp {
             return;
         }
 
-        // Register user with default student role
-        const result = this.auth.login(username, 'default_password', 'student');
+        // Check if user already exists
+        const users = this.auth.getUsers();
+        const existingUser = users.find(u => u.username === username || u.email === email);
         
-        if (result.success) {
-            // Update user with registration data
-            const updatedUser = {
-                ...result.user,
-                email,
-                disability
-            };
-            this.auth.updateUser(updatedUser);
-            this.currentUser = updatedUser;
+        if (existingUser) {
+            this.speak('User already exists. Please try a different username or email.');
+            return;
         }
+
+        // Create new user
+        const newUser = {
+            id: Date.now().toString(),
+            username,
+            email,
+            role: 'student',
+            disability,
+            createdAt: new Date().toISOString(),
+            lastLogin: new Date().toISOString(),
+            isActive: true,
+            preferences: {
+                language: this.currentLanguage,
+                speechRate: this.speechRate,
+                speechPitch: this.speechPitch,
+                volume: this.volume,
+                highContrast: false,
+                reducedMotion: false
+            }
+        };
+
+        // Add to users list
+        users.push(newUser);
+        localStorage.setItem('vaanisewa-users', JSON.stringify(users));
+
+        // Log the user in
+        const result = this.auth.login(username, 'default_password', 'student');
+        this.currentUser = result.user;
 
         this.speak(this.translations[this.currentLanguage].registrationSuccess, () => {
             this.initializeDashboards();
@@ -795,15 +936,29 @@ class VaaniSewaApp {
 
 // Initialize the app when DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
-    // Initialize security manager
-    window.securityManager = new SecurityManager();
-    
-    // Initialize data manager
-    window.dataManager = new DataManager(window.authSystem);
-    
-    window.vaaniSewaApp = new VaaniSewaApp();
-    
-    // Make dashboards globally accessible for event handlers
-    window.adminDashboard = window.vaaniSewaApp.adminDashboard;
-    window.userDashboard = window.vaaniSewaApp.userDashboard;
+    // Wait a bit for all scripts to load
+    setTimeout(() => {
+        try {
+            // Initialize security manager
+            if (typeof SecurityManager !== 'undefined') {
+                window.securityManager = new SecurityManager();
+            }
+            
+            // Initialize the main app
+            window.vaaniSewaApp = new VaaniSewaApp();
+            
+            // Initialize data manager
+            if (typeof DataManager !== 'undefined' && window.vaaniSewaApp.auth) {
+                window.dataManager = new DataManager(window.vaaniSewaApp.auth);
+            }
+            
+            // Make dashboards globally accessible for event handlers
+            window.adminDashboard = window.vaaniSewaApp.adminDashboard;
+            window.userDashboard = window.vaaniSewaApp.userDashboard;
+            
+            console.log('VaaniSewa app initialized successfully!');
+        } catch (error) {
+            console.error('Error initializing VaaniSewa app:', error);
+        }
+    }, 500);
 });

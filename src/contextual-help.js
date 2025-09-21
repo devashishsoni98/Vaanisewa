@@ -444,6 +444,36 @@ class ContextualHelp {
                 content: 'This is a section heading that describes the content below.',
                 voice: 'This is a section heading describing the content that follows.'
             },
+            'h1': {
+                title: 'Heading',
+                content: 'This is a section heading that describes the content below.',
+                voice: 'This is a section heading describing the content that follows.'
+            },
+            'h2': {
+                title: 'Heading',
+                content: 'This is a section heading that describes the content below.',
+                voice: 'This is a section heading describing the content that follows.'
+            },
+            'h3': {
+                title: 'Heading',
+                content: 'This is a section heading that describes the content below.',
+                voice: 'This is a section heading describing the content that follows.'
+            },
+            'h4': {
+                title: 'Heading',
+                content: 'This is a section heading that describes the content below.',
+                voice: 'This is a section heading describing the content that follows.'
+            },
+            'h5': {
+                title: 'Heading',
+                content: 'This is a section heading that describes the content below.',
+                voice: 'This is a section heading describing the content that follows.'
+            },
+            'h6': {
+                title: 'Heading',
+                content: 'This is a section heading that describes the content below.',
+                voice: 'This is a section heading describing the content that follows.'
+            },
             default: {
                 title: 'Interface Element',
                 content: 'This is an interactive element. Try clicking or using voice commands to interact with it.',

@@ -43,11 +43,11 @@ class AuthSystem {
     login(username, password, role = 'student') {
         // Mock authentication - in real app, this would call backend API
         const users = this.getUsers();
-        const user = users.find(u => u.username === username);
+        let user = users.find(u => u.username === username);
         
         if (!user) {
             // Create new user if doesn't exist (for demo purposes)
-            const newUser = {
+            user = {
                 id: Date.now().toString(),
                 username,
                 email: `${username}@example.com`,
@@ -67,7 +67,6 @@ class AuthSystem {
             };
             users.push(newUser);
             localStorage.setItem('vaanisewa-users', JSON.stringify(users));
-            user = newUser;
         } else {
             // Update last login
             user.lastLogin = new Date().toISOString();
