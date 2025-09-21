@@ -92,6 +92,18 @@ class ContextualHelp {
                 title: 'Statistics Overview',
                 content: 'Key metrics and statistics about system usage and performance.',
                 voice: 'Statistics overview showing key metrics about system usage and performance.'
+            },
+            
+            // Onboarding specific elements
+            '.onboarding-wizard': {
+                title: 'Onboarding Wizard',
+                content: 'Step-by-step tutorial to help you learn VaaniSewa features and voice commands.',
+                voice: 'Onboarding wizard. Follow the steps to learn VaaniSewa features and voice commands.'
+            },
+            '.wizard-demo-area': {
+                title: 'Interactive Demo',
+                content: 'Try the interactive demonstrations to practice using VaaniSewa features.',
+                voice: 'Interactive demo area. Practice using VaaniSewa features with these demonstrations.'
             }
         };
         

@@ -607,6 +607,8 @@ class VaaniSewaApp {
         this.currentUser = result.user;
         this.speak(this.translations[this.currentLanguage].loginSuccess, () => {
             this.initializeDashboards();
+            // Check for onboarding on login
+            this.checkOnboarding();
         });
     }
 
