@@ -16,6 +16,10 @@ class VaaniSewaApp {
         this.speechPitch = parseFloat(localStorage.getItem('vaanisewa-speech-pitch')) || 1.0;
         this.selectedVoice = localStorage.getItem('vaanisewa-selected-voice') || '';
         
+        // Initialize onboarding and help systems
+        this.onboardingWizard = null;
+        this.contextualHelp = null;
+        
         // Language translations
         this.translations = {
             en: {
@@ -155,6 +159,9 @@ class VaaniSewaApp {
     }
 
     init() {
+        // Initialize help and onboarding systems first
+        this.initializeHelpSystems();
+        
         this.setupVoiceRecognition();
         this.setupEventListeners();
         this.loadVoices();
@@ -175,6 +182,26 @@ class VaaniSewaApp {
         
         // Setup session management
         this.setupSessionManagement();
+        
+        // Check if user needs onboarding
+        this.checkOnboarding();
+    }
+
+    initializeHelpSystems() {
+        // Initialize contextual help system
+        this.contextualHelp = new ContextualHelp(this);
+        
+        // Initialize onboarding wizard
+        this.onboardingWizard = new OnboardingWizard(this);
+    }
+
+    checkOnboarding() {
+        // Show onboarding for new users or after login
+        if (OnboardingWizard.shouldShowOnboarding() && this.auth.currentUser) {
+            setTimeout(() => {
+                this.onboardingWizard.start();
+            }, 1000); // Delay to ensure UI is ready
+        }
     }
 
     initializeDashboards() {
