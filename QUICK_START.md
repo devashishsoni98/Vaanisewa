@@ -11,14 +11,13 @@
 
 1. **Download/Clone Project**
    ```bash
-   git clone <repository-url>
    cd vaanisewa-app
    ```
 
 2. **Start Server**
    ```bash
-   # Option 1: Node.js
-   npm install && npm run dev
+   # Option 1: Node.js (Recommended)
+   npm install && npm start
    
    # Option 2: Python
    python -m http.server 8000
@@ -28,7 +27,7 @@
    ```
 
 3. **Open Browser**
-   - Navigate to `http://localhost:8000` (or port shown)
+   - Navigate to `http://localhost:3000` (Node.js) or `http://localhost:8000` (Python/PHP)
    - Allow microphone permissions
 
 ## 🎯 Quick Demo (5 minutes)

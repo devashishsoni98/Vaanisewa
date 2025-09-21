@@ -1,0 +1,26 @@
+{
+  "name": "vaanisewa-app",
+  "version": "1.0.0",
+  "description": "VaaniSewa - Voice Accessibility Web Application",
+  "main": "index.html",
+  "scripts": {
+    "dev": "npx serve . -p 3000",
+    "start": "npx serve . -p 3000",
+    "build": "echo 'No build step required for static site'",
+    "preview": "npx serve . -p 4173"
+  },
+  "keywords": [
+    "accessibility",
+    "voice-control",
+    "web-app",
+    "assistive-technology"
+  ],
+  "author": "VaaniSewa Team",
+  "license": "MIT",
+  "devDependencies": {
+    "serve": "^14.2.1"
+  },
+  "engines": {
+    "node": ">=14.0.0"
+  }
+}

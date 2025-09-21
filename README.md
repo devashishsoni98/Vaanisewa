@@ -43,6 +43,7 @@ VaaniSewa is a comprehensive voice-controlled accessibility web application desi
 ## 🚀 Getting Started
 
 ### Prerequisites
+- **Node.js** (version 14 or higher) - [Download here](https://nodejs.org/)
 - Modern web browser with Web Speech API support (Chrome, Edge, Safari)
 - Microphone access for voice commands
 - Internet connection for initial setup
@@ -51,39 +52,47 @@ VaaniSewa is a comprehensive voice-controlled accessibility web application desi
 
 1. **Clone or download the project files**
    ```bash
-   git clone <repository-url>
    cd vaanisewa-app
    ```
 
-2. **Set up environment variables (optional)**
-   ```bash
-   cp .env.example .env
-   # Edit .env file with your API credentials if using external services
-   ```
-
-3. **Serve the application**
-   
-   **Option A: Using a local server (recommended)**
-   ```bash
-   # Using Python
-   python -m http.server 8000
-   
-   # Using Node.js
-   npx serve .
-   
-   # Using PHP
-   php -S localhost:8000
-   ```
-   
-   **Option B: Using Vite (for development)**
+2. **Install dependencies**
    ```bash
    npm install
+   ```
+
+3. **Start the development server**
+   ```bash
    npm run dev
    ```
 
+   Or alternatively:
+   ```bash
+   npm start
+   ```
+
 4. **Open in browser**
-   - Navigate to `http://localhost:8000` (or the port shown in terminal)
+   - Navigate to `http://localhost:3000`
    - Allow microphone permissions when prompted
+
+### Alternative Setup Methods
+
+If you prefer not to use Node.js, you can also run the application using:
+
+**Python:**
+```bash
+python -m http.server 8000
+# Then open http://localhost:8000
+```
+
+**PHP:**
+```bash
+php -S localhost:8000
+# Then open http://localhost:8000
+```
+
+**Live Server (VS Code Extension):**
+- Install the "Live Server" extension in VS Code
+- Right-click on `index.html` and select "Open with Live Server"
 
 ## 📱 Usage Instructions
 

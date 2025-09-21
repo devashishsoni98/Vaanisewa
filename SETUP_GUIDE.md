@@ -20,7 +20,6 @@ Before setting up the project, ensure you have:
 
 1. **Clone or Download the Project**
    ```bash
-   git clone <repository-url>
    cd vaanisewa-app
    ```
 
@@ -32,10 +31,12 @@ Before setting up the project, ensure you have:
 3. **Start Development Server**
    ```bash
    npm run dev
+   # or
+   npm start
    ```
 
 4. **Access the Application**
-   - Open browser and navigate to `http://localhost:5173`
+   - Open browser and navigate to `http://localhost:3000`
    - Allow microphone permissions when prompted
 
 ### Method 2: Using Python
