@@ -324,23 +324,9 @@ class VaaniSewaApp {
             return;
         }
 
+        // If recognition is already active, don't start again
         if (this.isRecognitionActive) {
-            console.log('Recognition already active, stopping first...');
-            this.recognition.stop();
-            return;
-        }
-
-        this._startRecognitionInternal();
-    }
-
-    _startRecognitionInternal() {
-        if (!this.recognition) {
-            console.warn('Speech recognition not available');
-            return;
-        }
-
-        if (this.isRecognitionActive) {
-            console.log('Recognition still active, cannot start');
+            console.log('Recognition already active, skipping start');
             return;
         }
 
@@ -351,21 +337,16 @@ class VaaniSewaApp {
             console.log('Starting speech recognition...');
             this.recognition.start();
             
-            // Set a timeout to restart recognition if it doesn't start properly
-            this.recognitionTimeout = setTimeout(() => {
-                if (!this.isRecognitionActive && this.continuousListening) {
-                    console.log('Recognition timeout, restarting...');
-                    this.startListening();
-                }
-            }, 5000);
-            
         } catch (error) {
             console.error('Error starting speech recognition:', error);
+            this.isRecognitionActive = false;
             
-            // Try to restart after a delay
+            // Try to restart after a delay if continuous listening is enabled
             if (this.continuousListening) {
                 this.restartTimeout = setTimeout(() => {
-                    this._startRecognitionInternal();
+                    if (!this.isRecognitionActive) {
+                        this.startListening();
+                    }
                 }, 2000);
             }
         }
@@ -392,11 +373,18 @@ class VaaniSewaApp {
         // Show processing status
         this.updateStatus(this.t('processing'), true);
         
+        // Temporarily stop continuous listening while processing command
+        const wasListening = this.isRecognitionActive;
+        if (wasListening && this.recognition) {
+            this.recognition.stop();
+        }
+        
         // Define command mappings for both languages
         const commands = {
             // English commands
             'register user': () => this.showScreen('registration'),
             'register': () => this.showScreen('registration'),
+            'registration': () => this.showScreen('registration'),
             'login': () => this.showScreen('login'),
             'log in': () => this.showScreen('login'),
             'home': () => this.showScreen('dashboard'),
@@ -405,6 +393,8 @@ class VaaniSewaApp {
             'help': () => this.showScreen('help'),
             'logout': () => this.logout(),
             'log out': () => this.logout(),
+            'back': () => this.goBack(),
+            'go back': () => this.goBack(),
             'volume up': () => this.adjustVolume(0.1),
             'volume down': () => this.adjustVolume(-0.1),
             'increase volume': () => this.adjustVolume(0.1),
@@ -422,28 +412,85 @@ class VaaniSewaApp {
             'लॉगआउट': () => this.logout(),
             'आवाज़ बढ़ाएं': () => this.adjustVolume(0.1),
             'आवाज़ कम करें': () => this.adjustVolume(-0.1),
+            'वापस': () => this.goBack(),
         };
 
         // Find and execute command
-        const commandFound = Object.keys(commands).find(cmd => 
-            command.includes(cmd.toLowerCase())
-        );
+        let commandFound = null;
+        let bestMatch = '';
+        
+        // Find the best matching command (longest match)
+        Object.keys(commands).forEach(cmd => {
+            if (command.includes(cmd.toLowerCase()) && cmd.length > bestMatch.length) {
+                commandFound = cmd;
+                bestMatch = cmd;
+            }
+        });
+        
+        // Also try exact matches
+        if (!commandFound) {
+            commandFound = Object.keys(commands).find(cmd => 
+                cmd.toLowerCase() === command
+            );
+        }
+        
+        // Try partial matches for common variations
+        if (!commandFound) {
+            const partialMatches = {
+                'register': 'register user',
+                'पंजीकरण': 'उपयोगकर्ता पंजीकरण',
+                'volume': command.includes('up') ? 'volume up' : 'volume down',
+                'आवाज़': command.includes('बढ़') ? 'आवाज़ बढ़ाएं' : 'आवाज़ कम करें'
+            };
+            
+            Object.keys(partialMatches).forEach(partial => {
+                if (command.includes(partial) && commands[partialMatches[partial]]) {
+                    commandFound = partialMatches[partial];
+                }
+            });
+        }
 
-        if (commandFound) {
+        if (commandFound && commands[commandFound]) {
             console.log('Executing command:', commandFound);
-            commands[commandFound]();
-            this.speak(`Command executed: ${commandFound}`);
+            try {
+                commands[commandFound]();
+                this.speak(this.currentLanguage === 'en' ? 
+                    `Command executed: ${commandFound}` : 
+                    `कमांड निष्पादित: ${commandFound}`
+        );
+            } catch (error) {
+                console.error('Error executing command:', error);
+                this.speak(this.currentLanguage === 'en' ? 
+                    'Error executing command' : 
+                    'कमांड निष्पादित करने में त्रुटि'
+                );
+            }
         } else {
             console.log('Command not recognized:', command);
-            this.speak('Command not recognized. Say "help" to see available commands.');
+            this.speak(this.currentLanguage === 'en' ? 
+                'Command not recognized. Say "help" to see available commands.' :
+                'कमांड पहचाना नहीं गया। उपलब्ध कमांड देखने के लिए "सहायता" कहें।'
+            );
         }
 
         // Reset status after processing
         setTimeout(() => {
-            if (this.continuousListening) {
+            if (this.continuousListening && !this.isRecognitionActive) {
                 this.updateStatus(this.t('readyToListen'), false);
+                this.startListening();
             }
-        }, 2000);
+        }, 1500);
+    }
+
+    goBack() {
+        // Simple back navigation logic
+        if (this.currentScreen === 'dashboard') {
+            this.showScreen('welcome');
+        } else if (['settings', 'help'].includes(this.currentScreen)) {
+            this.showScreen('dashboard');
+        } else {
+            this.showScreen('welcome');
+        }
     }
 
     speak(text, options = {}) {
