@@ -46,27 +46,7 @@ class AuthSystem {
         let user = users.find(u => u.username === username);
         
         if (!user) {
-            // Create new user if doesn't exist (for demo purposes)
-            user = {
-                id: Date.now().toString(),
-                username,
-                email: `${username}@example.com`,
-                role,
-                disability: 'visual',
-                createdAt: new Date().toISOString(),
-                lastLogin: new Date().toISOString(),
-                isActive: true,
-                preferences: {
-                    language: 'en',
-                    speechRate: 1.0,
-                    speechPitch: 1.0,
-                    volume: 0.7,
-                    highContrast: false,
-                    reducedMotion: false
-                }
-            };
-            users.push(newUser);
-            localStorage.setItem('vaanisewa-users', JSON.stringify(users));
+            return { success: false, error: 'User not found' };
         } else {
             // Update last login
             user.lastLogin = new Date().toISOString();
@@ -84,6 +64,52 @@ class AuthSystem {
         localStorage.setItem('vaanisewa-session', JSON.stringify(session));
         this.currentUser = user;
         this.logActivity('login', { username, role });
+        
+        return { success: true, user, token };
+    }
+    
+    register(username, email, disability, role = 'student') {
+        const users = this.getUsers();
+        
+        // Check if user already exists
+        if (users.find(u => u.username === username || u.email === email)) {
+            return { success: false, error: 'User already exists' };
+        }
+        
+        const user = {
+            id: Date.now().toString(),
+            username,
+            email,
+            role,
+            disability,
+            createdAt: new Date().toISOString(),
+            lastLogin: new Date().toISOString(),
+            isActive: true,
+            preferences: {
+                language: 'en',
+                speechRate: 1.0,
+                speechPitch: 1.0,
+                volume: 0.7,
+                highContrast: false,
+                reducedMotion: false
+            }
+        };
+        
+        users.push(user);
+        localStorage.setItem('vaanisewa-users', JSON.stringify(users));
+        
+        // Auto-login after registration
+        const token = this.generateToken(user);
+        const session = {
+            user,
+            token,
+            loginTime: Date.now(),
+            lastActivity: Date.now()
+        };
+        
+        localStorage.setItem('vaanisewa-session', JSON.stringify(session));
+        this.currentUser = user;
+        this.logActivity('registration', { username, email, disability });
         
         return { success: true, user, token };
     }

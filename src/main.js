@@ -11,10 +11,13 @@ class VaaniSewaApp {
         this.speechRate = 1.0;
         this.speechPitch = 1.0;
         this.selectedVoice = null;
-        this.continuousListening = true;
+        this.continuousListening = false;
         this.recognitionTimeout = null;
         this.restartTimeout = null;
         this.isRecognitionActive = false;
+        this.currentUser = null;
+        this.authSystem = null;
+        this.userDashboard = null;
         
         // Translation object
         this.translations = {
@@ -115,18 +118,32 @@ class VaaniSewaApp {
             // Setup event listeners first
             this.setupEventListeners();
             
+            // Initialize auth system
+            this.authSystem = new AuthSystem();
+            
             // Load voices
             await this.loadVoices();
             
             // Update UI with current language
             this.updateLanguage();
             
-            // Initialize voice recognition (simplified)
-            this.initializeSimpleVoiceRecognition();
+            // Initialize voice recognition
+            this.initializeVoiceRecognition();
+            
+            // Check if user is already logged in
+            this.checkExistingSession();
             
             console.log('VaaniSewa App initialized successfully');
         } catch (error) {
             console.error('Error initializing app:', error);
+        }
+    }
+
+    checkExistingSession() {
+        const session = this.authSystem.loadSession();
+        if (session && session.user) {
+            this.currentUser = session.user;
+            this.showUserAnalytics();
         }
     }
 
@@ -165,7 +182,7 @@ class VaaniSewaApp {
         });
     }
 
-    initializeSimpleVoiceRecognition() {
+    initializeVoiceRecognition() {
         if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
             console.warn('Speech recognition not supported');
             this.updateStatus('Speech recognition not supported in this browser', false);
@@ -176,8 +193,8 @@ class VaaniSewaApp {
             const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
             this.recognition = new SpeechRecognition();
             
-            // Simple configuration
-            this.recognition.continuous = true;
+            // Configuration
+            this.recognition.continuous = false;
             this.recognition.interimResults = false;
             this.recognition.lang = this.currentLanguage === 'en' ? 'en-US' : 'hi-IN';
 
@@ -185,6 +202,7 @@ class VaaniSewaApp {
             this.recognition.onstart = () => {
                 console.log('Voice recognition started');
                 this.isRecognitionActive = true;
+                this.isListening = true;
                 this.updateStatus(this.t('listening'), true);
             };
 
@@ -193,13 +211,14 @@ class VaaniSewaApp {
                 if (lastResult.isFinal) {
                     const transcript = lastResult[0].transcript.trim().toLowerCase();
                     console.log('Voice command:', transcript);
-                    this.processSimpleVoiceCommand(transcript);
+                    this.processVoiceCommand(transcript);
                 }
             };
 
             this.recognition.onerror = (event) => {
                 console.log('Speech recognition error:', event.error);
                 this.isRecognitionActive = false;
+                this.isListening = false;
                 
                 // Don't restart on certain errors
                 if (['not-allowed', 'audio-capture'].includes(event.error)) {
@@ -207,30 +226,18 @@ class VaaniSewaApp {
                     return;
                 }
                 
-                // Restart after error
-                setTimeout(() => {
-                    if (this.continuousListening && !this.isRecognitionActive) {
-                        this.startSimpleListening();
-                    }
-                }, 2000);
+                this.updateStatus('Voice recognition error', false);
             };
 
             this.recognition.onend = () => {
                 console.log('Voice recognition ended');
                 this.isRecognitionActive = false;
-                
-                // Restart if continuous listening is enabled
-                if (this.continuousListening) {
-                    setTimeout(() => {
-                        if (!this.isRecognitionActive) {
-                            this.startSimpleListening();
-                        }
-                    }, 1000);
-                }
+                this.isListening = false;
+                this.updateStatus('Click to start listening', false);
             };
 
-            // Start listening
-            this.startSimpleListening();
+            // Initial status
+            this.updateStatus('Click to start listening', false);
             
         } catch (error) {
             console.error('Error initializing voice recognition:', error);
@@ -238,7 +245,7 @@ class VaaniSewaApp {
         }
     }
 
-    startSimpleListening() {
+    startListening() {
         if (!this.recognition || this.isRecognitionActive) {
             return;
         }
@@ -248,16 +255,18 @@ class VaaniSewaApp {
             this.recognition.start();
         } catch (error) {
             console.error('Error starting recognition:', error);
-            setTimeout(() => {
-                if (!this.isRecognitionActive && this.continuousListening) {
-                    this.startSimpleListening();
-                }
-            }, 3000);
+            this.updateStatus('Error starting voice recognition', false);
         }
     }
 
-    processSimpleVoiceCommand(command) {
-        console.log('Processing simple voice command:', command);
+    stopListening() {
+        if (this.recognition && this.isRecognitionActive) {
+            this.recognition.stop();
+        }
+    }
+
+    processVoiceCommand(command) {
+        console.log('Processing voice command:', command);
         
         // Basic command mappings
         const commands = {
@@ -272,12 +281,18 @@ class VaaniSewaApp {
             
             'home': () => this.showScreen('dashboard'),
             'dashboard': () => this.showScreen('dashboard'),
+            'analytics': () => this.showUserAnalytics(),
             
             'help': () => this.showScreen('help'),
             
             'logout': () => this.logout(),
             'log out': () => this.logout(),
             'sign out': () => this.logout(),
+            
+            'settings': () => this.showScreen('settings'),
+            
+            'volume up': () => this.adjustVolume(0.1),
+            'volume down': () => this.adjustVolume(-0.1),
             
             // Hindi commands
             'पंजीकरण': () => this.showScreen('registration'),
@@ -292,6 +307,11 @@ class VaaniSewaApp {
             'मदद': () => this.showScreen('help'),
             
             'लॉगआउट': () => this.logout(),
+            
+            'सेटिंग्स': () => this.showScreen('settings'),
+            
+            'आवाज़ बढ़ाएं': () => this.adjustVolume(0.1),
+            'आवाज़ कम करें': () => this.adjustVolume(-0.1),
         };
 
         // Find matching command
@@ -307,7 +327,12 @@ class VaaniSewaApp {
             console.log('Executing command:', commandFound);
             try {
                 commands[commandFound]();
-                this.speak(`Executing ${commandFound}`);
+                this.speak(`Command executed: ${commandFound}`);
+                
+                // Log activity if user is logged in
+                if (this.currentUser && this.authSystem) {
+                    this.authSystem.logActivity('voice_command', { command: commandFound });
+                }
             } catch (error) {
                 console.error('Error executing command:', error);
                 this.speak('Error executing command');
@@ -435,14 +460,22 @@ class VaaniSewaApp {
         if (backToDashboardBtn) {
             backToDashboardBtn.addEventListener('click', () => {
                 console.log('Back to dashboard clicked');
-                this.showScreen('dashboard');
+                if (this.currentUser) {
+                    this.showUserAnalytics();
+                } else {
+                    this.showScreen('dashboard');
+                }
             });
         }
         
         if (backFromHelpBtn) {
             backFromHelpBtn.addEventListener('click', () => {
                 console.log('Back from help clicked');
-                this.showScreen('welcome');
+                if (this.currentUser) {
+                    this.showUserAnalytics();
+                } else {
+                    this.showScreen('welcome');
+                }
             });
         }
         
@@ -519,23 +552,78 @@ class VaaniSewaApp {
             });
         }
 
-        // Manual listening toggle (click on status bar)
+        // Voice control toggle (click on status bar)
         const listeningStatus = document.querySelector('.listening-status');
         if (listeningStatus) {
             listeningStatus.addEventListener('click', () => {
-                if (this.isRecognitionActive) {
-                    this.continuousListening = false;
-                    if (this.recognition) {
-                        this.recognition.stop();
-                    }
-                    this.speak('Voice recognition stopped. Click again to restart.');
+                if (this.isListening) {
+                    this.stopListening();
+                    this.speak('Voice recognition stopped.');
                 } else {
-                    this.continuousListening = true;
-                    this.startSimpleListening();
-                    this.speak('Voice recognition started. You can now use voice commands.');
+                    this.startListening();
+                    this.speak('Voice recognition started. Speak your command.');
                 }
             });
         }
+        
+        // Microphone button for voice input in forms
+        document.addEventListener('click', (e) => {
+            if (e.target.classList.contains('mic-btn')) {
+                const field = e.target.dataset.field;
+                this.handleVoiceInput(field, e.target);
+            }
+        });
+    }
+    
+    handleVoiceInput(fieldName, button) {
+        if (!this.recognition) {
+            this.speak('Voice recognition not available');
+            return;
+        }
+        
+        button.classList.add('listening');
+        this.speak('Speak now');
+        
+        const tempRecognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+        tempRecognition.continuous = false;
+        tempRecognition.interimResults = false;
+        tempRecognition.lang = this.currentLanguage === 'en' ? 'en-US' : 'hi-IN';
+        
+        tempRecognition.onresult = (event) => {
+            const transcript = event.results[0][0].transcript;
+            const targetInput = document.getElementById(fieldName) || 
+                              document.querySelector(`input[data-field="${fieldName}"]`) ||
+                              document.querySelector(`select[data-field="${fieldName}"]`);
+            
+            if (targetInput) {
+                if (targetInput.tagName === 'SELECT') {
+                    // Handle dropdown selections
+                    const options = Array.from(targetInput.options);
+                    const matchedOption = options.find(option => 
+                        option.text.toLowerCase().includes(transcript.toLowerCase()) ||
+                        option.value.toLowerCase().includes(transcript.toLowerCase())
+                    );
+                    if (matchedOption) {
+                        targetInput.value = matchedOption.value;
+                    }
+                } else {
+                    targetInput.value = transcript;
+                }
+                this.speak(`Entered: ${transcript}`);
+            }
+            button.classList.remove('listening');
+        };
+        
+        tempRecognition.onerror = () => {
+            button.classList.remove('listening');
+            this.speak('Voice input failed');
+        };
+        
+        tempRecognition.onend = () => {
+            button.classList.remove('listening');
+        };
+        
+        tempRecognition.start();
     }
 
     handleRegistration() {
@@ -548,14 +636,20 @@ class VaaniSewaApp {
             return;
         }
 
-        // Simulate registration
+        // Register user through auth system
         console.log('Registration:', { username, email, disability });
-        this.speak('Registration successful! Welcome to VaaniSewa.');
         
-        // Show dashboard
-        setTimeout(() => {
-            this.showScreen('dashboard');
-        }, 2000);
+        const result = this.authSystem.register(username, email, disability);
+        if (result.success) {
+            this.currentUser = result.user;
+            this.speak('Registration successful! Welcome to VaaniSewa.');
+            
+            setTimeout(() => {
+                this.showUserAnalytics();
+            }, 2000);
+        } else {
+            this.speak('Registration failed. Please try again.');
+        }
     }
 
     handleLogin() {
@@ -566,14 +660,36 @@ class VaaniSewaApp {
             return;
         }
 
-        // Simulate login
+        // Login through auth system
         console.log('Login:', { username });
-        this.speak(`Welcome back, ${username}!`);
         
-        // Show dashboard
-        setTimeout(() => {
-            this.showScreen('dashboard');
-        }, 2000);
+        const result = this.authSystem.login(username);
+        if (result.success) {
+            this.currentUser = result.user;
+            this.speak(`Welcome back, ${username}!`);
+            
+            setTimeout(() => {
+                this.showUserAnalytics();
+            }, 2000);
+        } else {
+            this.speak('Login failed. Please check your username.');
+        }
+    }
+    
+    showUserAnalytics() {
+        if (!this.currentUser) {
+            this.showScreen('welcome');
+            return;
+        }
+        
+        // Initialize user dashboard if not already done
+        if (!this.userDashboard) {
+            this.userDashboard = new UserDashboard(this.authSystem);
+        }
+        
+        // Show user dashboard
+        this.showScreen('userDashboard');
+        this.speak('Analytics dashboard loaded');
     }
 
     showScreen(screenName) {
@@ -614,6 +730,13 @@ class VaaniSewaApp {
     }
 
     logout() {
+        if (this.authSystem && this.currentUser) {
+            this.authSystem.logout();
+        }
+        
+        this.currentUser = null;
+        this.userDashboard = null;
+        
         const message = this.currentLanguage === 'en' ? 
             'Logging out. Thank you for using VaaniSewa!' :
             'लॉगआउट कर रहे हैं। VaaniSewa का उपयोग करने के लिए धन्यवाद!';

@@ -124,6 +124,18 @@ body {
     opacity: 0.8;
 }
 
+.voice-controls {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+}
+
+.voice-controls .btn {
+    min-width: 40px;
+    min-height: 40px;
+    padding: 0.5rem;
+}
+
 /* Main Content */
 .main-content {
     max-width: 1200px;
