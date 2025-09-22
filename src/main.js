@@ -57,6 +57,7 @@ class VaaniSewaApp {
                 listening: "Listening...",
                 processing: "Processing voice command...",
                 commandsHint: 'Say: "register user", "login", "home", "settings", "help"'
+                commandsHint: 'Try: "register", "login", "help", "settings" or click below'
             },
             hi: {
                 welcome: "VaaniSewa में आपका स्वागत है",
@@ -95,6 +96,7 @@ class VaaniSewaApp {
                 listening: "सुन रहा है...",
                 processing: "आवाज कमांड प्रोसेस कर रहा है...",
                 commandsHint: 'कहें: "उपयोगकर्ता पंजीकरण", "लॉगिन करें", "होम", "सेटिंग्स", "सहायता"'
+                commandsHint: 'कहें: "पंजीकरण", "लॉगिन", "सहायता", "सेटिंग्स" या नीचे क्लिक करें'
             }
         };
 
@@ -722,10 +724,12 @@ class VaaniSewaApp {
         const listeningStatus = document.querySelector('.listening-status');
         if (listeningStatus) {
             listeningStatus.addEventListener('click', () => {
-                if (this.continuousListening) {
+                if (this.isRecognitionActive) {
                     this.stopContinuousListening();
+                    this.speak('Voice recognition stopped. Click again to restart.');
                 } else {
                     this.startContinuousListening();
+                    this.speak('Voice recognition started. You can now use voice commands.');
                 }
             });
         }
