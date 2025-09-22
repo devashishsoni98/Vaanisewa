@@ -353,6 +353,7 @@ class VaaniSewaApp {
             this.recognition.continuous = true;
             this.recognition.interimResults = false;
             this.recognition.lang = this.currentLanguage === 'hi' ? 'hi-IN' : 'en-US';
+            this.recognition.maxAlternatives = 1;
             
             this.recognition.onstart = () => {
                 this.isListening = true;
@@ -364,26 +365,96 @@ class VaaniSewaApp {
                 this.isListening = false;
                 this.updateListeningStatus();
                 console.log('Voice recognition ended, restarting...');
-                // Restart listening after a short delay
-                setTimeout(() => this.startListening(), 1000);
+                // Restart listening immediately if not manually stopped
+                if (!this.manualStop) {
+                    setTimeout(() => {
+                        if (!this.isListening) {
+                            this.startListening();
+                        }
+                    }, 500);
+                }
             };
             
             this.recognition.onresult = (event) => {
-                const lastResult = event.results[event.results.length - 1];
-                if (lastResult.isFinal) {
-                    const command = lastResult[0].transcript.toLowerCase().trim();
-                    console.log('Voice command received:', command);
-                    // Log voice command activity
-                    if (this.auth.currentUser) {
-                        this.auth.logActivity('voice_command', { command });
+                for (let i = event.resultIndex; i < event.results.length; i++) {
+                    const result = event.results[i];
+                    if (result.isFinal) {
+                        const command = result[0].transcript.toLowerCase().trim();
+                        console.log('Voice command received:', command);
+                        // Log voice command activity
+                        if (this.auth.currentUser) {
+                            this.auth.logActivity('voice_command', { command });
+                        }
+                        this.processVoiceCommand(command);
                     }
-                    this.processVoiceCommand(command);
                 }
             };
             
             this.recognition.onerror = (event) => {
                 console.error('Speech recognition error:', event.error);
-                if (event.error === 'not-allowed') {
+                
+                // Handle different error types appropriately
+                switch (event.error) {
+                    case 'not-allowed':
+                    case 'service-not-allowed':
+                        this.speak(this.translations[this.currentLanguage].microphoneError);
+                        this.manualStop = true;
+                        break;
+                    case 'no-speech':
+                        console.log('No speech detected, continuing...');
+                        // Don't restart immediately for no-speech, let onend handle it
+                        break;
+                    case 'aborted':
+                        console.log('Speech recognition aborted');
+                        // Let onend handler restart
+                        break;
+                    case 'network':
+                        console.log('Network error, will retry');
+                        // Let onend handler restart after delay
+                        break;
+                    case 'audio-capture':
+                        console.log('Audio capture error');
+                        this.speak('Microphone error. Please check your microphone.');
+                        break;
+                    default:
+                        console.log('Other speech recognition error:', event.error);
+                        // Let onend handler restart
+                        break;
+                }
+            };
+        } else {
+            console.warn('Speech recognition not supported');
+            this.speak(this.translations[this.currentLanguage].voiceNotSupported);
+        }
+    }
+
+@@ .. @@
+    init() {
+        this.setupVoiceRecognition();
+        this.setupEventListeners();
+        this.loadVoices();
+        this.updateLanguage();
+        this.updateVolumeDisplay();
+        this.updateSpeechSettings();
+        
+        // Initialize help and onboarding systems after DOM is ready
+        setTimeout(() => {
+            this.initializeHelpSystems();
+        }, 100);
+        
+        // Initialize dashboards based on user role
+        if (this.auth.currentUser) {
+            this.currentUser = this.auth.currentUser;
+            this.initializeDashboards();
+            this.checkOnboarding();
+        } else {
+            this.showScreen('welcome');
+            // Set up demo accounts
+            this.setupDemoAccounts();
+        }
+
+        // Start listening for voice commands
++        this.manualStop = false;
                     this.speak(this.translations[this.currentLanguage].microphoneError);
                 } else if (event.error === 'no-speech') {
                     console.log('No speech detected, continuing...');
@@ -500,7 +571,21 @@ class VaaniSewaApp {
         // Keyboard navigation
         document.addEventListener('keydown', (e) => {
             if (e.key === 'Escape') {
-                this.stopListening();
+                // Toggle listening on Escape
+                if (this.isListening) {
+                    this.stopListening();
+                } else {
+                    this.startListening();
+                }
+            }
+        });
+        
+        // Handle page visibility changes to restart recognition
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'visible' && !this.isListening && !this.manualStop) {
+                setTimeout(() => {
+                    this.startListening();
+                }, 1000);
             }
         });
     }
@@ -557,15 +642,28 @@ class VaaniSewaApp {
     startListening() {
         if (this.recognition && !this.isListening) {
             try {
+                this.manualStop = false;
                 this.recognition.start();
             } catch (error) {
                 console.error('Error starting recognition:', error);
+                // If recognition is already started, don't try to restart immediately
+                if (error.name === 'InvalidStateError') {
+                    console.log('Recognition already active');
+                    return;
+                }
+                // Retry after a delay for other errors
+                setTimeout(() => {
+                    if (!this.isListening && !this.manualStop) {
+                        this.startListening();
+                    }
+                }, 1000);
             }
         }
     }
 
     stopListening() {
         if (this.recognition && this.isListening) {
+            this.manualStop = true;
             this.recognition.stop();
         }
     }
@@ -589,7 +687,8 @@ class VaaniSewaApp {
     processVoiceCommand(command) {
         console.log('Voice command received:', command);
         
-        this.showLoading();
+        // Don't show loading for every command to avoid UI disruption
+        // this.showLoading();
         
         // Check commands in current language
         const commands = this.voiceCommands[this.currentLanguage];
@@ -598,19 +697,25 @@ class VaaniSewaApp {
         for (const [key, action] of Object.entries(commands)) {
             if (command.includes(key)) {
                 commandFound = true;
-                setTimeout(() => {
-                    this.hideLoading();
+                console.log('Executing command:', key);
+                try {
                     action();
-                }, 500);
+                    // Provide audio feedback for successful command
+                    this.speak(`Command ${key} executed`);
+                } catch (error) {
+                    console.error('Error executing command:', error);
+                    this.speak('Error executing command');
+                }
                 break;
             }
         }
 
         if (!commandFound) {
-            setTimeout(() => {
-                this.hideLoading();
+            console.log('Command not recognized:', command);
+            // Only speak "not recognized" for longer commands to avoid spam
+            if (command.length > 3) {
                 this.speak(this.translations[this.currentLanguage].commandNotRecognized);
-            }, 500);
+            }
         }
     }
 
@@ -815,7 +920,11 @@ class VaaniSewaApp {
         
         // Update voice recognition language
         if (this.recognition) {
+            this.stopListening();
             this.recognition.lang = this.currentLanguage === 'hi' ? 'hi-IN' : 'en-US';
+            setTimeout(() => {
+                this.startListening();
+            }, 500);
         }
     }
 
