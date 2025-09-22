@@ -15,8 +15,6 @@ class VaaniSewaApp {
         this.recognitionTimeout = null;
         this.restartTimeout = null;
         this.isRecognitionActive = false;
-        this.lastSpeechTime = 0;
-        this.silenceTimeout = null;
         
         // Translation object
         this.translations = {
@@ -26,7 +24,7 @@ class VaaniSewaApp {
                 register: "Register",
                 login: "Login",
                 voiceCommands: "Voice Commands:",
-                registerCommand: '"register user" - Start registration',
+                registerCommand: '"register" - Start registration',
                 loginCommand: '"login" - Start login process',
                 helpCommand: '"help" - Get assistance',
                 voiceRegistration: "Voice Registration",
@@ -56,8 +54,7 @@ class VaaniSewaApp {
                 clickToStart: "Click to start listening",
                 listening: "Listening...",
                 processing: "Processing voice command...",
-                commandsHint: 'Say: "register user", "login", "home", "settings", "help"'
-                commandsHint: 'Try: "register", "login", "help", "settings" or click below'
+                commandsHint: 'Try: "register", "login", "help", "home" or click below'
             },
             hi: {
                 welcome: "VaaniSewa में आपका स्वागत है",
@@ -65,8 +62,8 @@ class VaaniSewaApp {
                 register: "पंजीकरण",
                 login: "लॉगिन",
                 voiceCommands: "आवाज कमांड:",
-                registerCommand: '"उपयोगकर्ता पंजीकरण" - पंजीकरण शुरू करें',
-                loginCommand: '"लॉगिन करें" - लॉगिन प्रक्रिया शुरू करें',
+                registerCommand: '"पंजीकरण" - पंजीकरण शुरू करें',
+                loginCommand: '"लॉगिन" - लॉगिन प्रक्रिया शुरू करें',
                 helpCommand: '"सहायता" - सहायता प्राप्त करें',
                 voiceRegistration: "आवाज पंजीकरण",
                 username: "उपयोगकर्ता नाम:",
@@ -95,8 +92,7 @@ class VaaniSewaApp {
                 clickToStart: "सुनना शुरू करने के लिए क्लिक करें",
                 listening: "सुन रहा है...",
                 processing: "आवाज कमांड प्रोसेस कर रहा है...",
-                commandsHint: 'कहें: "उपयोगकर्ता पंजीकरण", "लॉगिन करें", "होम", "सेटिंग्स", "सहायता"'
-                commandsHint: 'कहें: "पंजीकरण", "लॉगिन", "सहायता", "सेटिंग्स" या नीचे क्लिक करें'
+                commandsHint: 'कहें: "पंजीकरण", "लॉगिन", "सहायता", "होम" या नीचे क्लिक करें'
             }
         };
 
@@ -116,27 +112,21 @@ class VaaniSewaApp {
 
     async setupApp() {
         try {
-            // Initialize voice recognition first
-            await this.initializeVoiceRecognition();
+            // Setup event listeners first
+            this.setupEventListeners();
             
             // Load voices
             await this.loadVoices();
             
-            // Setup event listeners
-            this.setupEventListeners();
-            
             // Update UI with current language
             this.updateLanguage();
             
-            // Start continuous listening
-            setTimeout(() => {
-                this.startContinuousListening();
-            }, 1000);
+            // Initialize voice recognition (simplified)
+            this.initializeSimpleVoiceRecognition();
             
             console.log('VaaniSewa App initialized successfully');
         } catch (error) {
             console.error('Error initializing app:', error);
-            this.speak('Application initialization failed. Some features may not work properly.');
         }
     }
 
@@ -149,7 +139,6 @@ class VaaniSewaApp {
                     this.populateVoiceSelect();
                     resolve();
                 } else {
-                    // Voices not loaded yet, wait a bit
                     setTimeout(loadVoicesImpl, 100);
                 }
             };
@@ -176,11 +165,10 @@ class VaaniSewaApp {
         });
     }
 
-    async initializeVoiceRecognition() {
+    initializeSimpleVoiceRecognition() {
         if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
             console.warn('Speech recognition not supported');
             this.updateStatus('Speech recognition not supported in this browser', false);
-            this.speak('Speech recognition is not supported in this browser. Please use Chrome or Edge for voice commands.');
             return;
         }
 
@@ -188,39 +176,61 @@ class VaaniSewaApp {
             const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
             this.recognition = new SpeechRecognition();
             
-            // Configure recognition
+            // Simple configuration
             this.recognition.continuous = true;
-            this.recognition.interimResults = true;
-            this.recognition.maxAlternatives = 3;
+            this.recognition.interimResults = false;
             this.recognition.lang = this.currentLanguage === 'en' ? 'en-US' : 'hi-IN';
 
             // Event handlers
             this.recognition.onstart = () => {
-                console.log('Speech recognition started');
+                console.log('Voice recognition started');
                 this.isRecognitionActive = true;
                 this.updateStatus(this.t('listening'), true);
-                this.clearTimeouts();
             };
 
             this.recognition.onresult = (event) => {
-                console.log('Speech recognition result received');
-                this.handleSpeechResult(event);
+                const lastResult = event.results[event.results.length - 1];
+                if (lastResult.isFinal) {
+                    const transcript = lastResult[0].transcript.trim().toLowerCase();
+                    console.log('Voice command:', transcript);
+                    this.processSimpleVoiceCommand(transcript);
+                }
             };
 
             this.recognition.onerror = (event) => {
                 console.log('Speech recognition error:', event.error);
-                this.handleSpeechError(event);
+                this.isRecognitionActive = false;
+                
+                // Don't restart on certain errors
+                if (['not-allowed', 'audio-capture'].includes(event.error)) {
+                    this.updateStatus('Microphone access denied', false);
+                    return;
+                }
+                
+                // Restart after error
+                setTimeout(() => {
+                    if (this.continuousListening && !this.isRecognitionActive) {
+                        this.startSimpleListening();
+                    }
+                }, 2000);
             };
 
             this.recognition.onend = () => {
-                console.log('Speech recognition ended');
+                console.log('Voice recognition ended');
                 this.isRecognitionActive = false;
-                this.handleSpeechEnd();
+                
+                // Restart if continuous listening is enabled
+                if (this.continuousListening) {
+                    setTimeout(() => {
+                        if (!this.isRecognitionActive) {
+                            this.startSimpleListening();
+                        }
+                    }, 1000);
+                }
             };
 
-            console.log('Voice recognition initialized successfully');
-            this.updateStatus(this.t('readyToListen'), false);
-            this.speak('Voice recognition is ready. You can now use voice commands.');
+            // Start listening
+            this.startSimpleListening();
             
         } catch (error) {
             console.error('Error initializing voice recognition:', error);
@@ -228,300 +238,83 @@ class VaaniSewaApp {
         }
     }
 
-    handleSpeechResult(event) {
-        let finalTranscript = '';
-        let interimTranscript = '';
-
-        for (let i = event.resultIndex; i < event.results.length; i++) {
-            const transcript = event.results[i][0].transcript;
-            
-            if (event.results[i].isFinal) {
-                finalTranscript += transcript;
-            } else {
-                interimTranscript += transcript;
-            }
-        }
-
-        if (finalTranscript) {
-            console.log('Final transcript:', finalTranscript);
-            this.lastSpeechTime = Date.now();
-            this.processVoiceCommand(finalTranscript.trim().toLowerCase());
-        } else if (interimTranscript) {
-            console.log('Interim transcript:', interimTranscript);
-            // Show interim results in status
-            this.updateStatus(`${this.t('listening')} "${interimTranscript}"`, true);
-        }
-    }
-
-    handleSpeechError(event) {
-        console.log('Speech error details:', event.error, event.message);
-        
-        switch (event.error) {
-            case 'no-speech':
-                console.log('No speech detected, restarting...');
-                break;
-            case 'audio-capture':
-                console.error('Audio capture failed');
-                this.updateStatus('Microphone access failed', false);
-                this.speak('Microphone access failed. Please check your microphone permissions.');
-                return;
-            case 'not-allowed':
-                console.error('Speech recognition not allowed');
-                this.updateStatus('Speech recognition not allowed', false);
-                this.speak('Speech recognition permission denied. Please allow microphone access.');
-                return;
-            case 'network':
-                console.error('Network error in speech recognition');
-                this.updateStatus('Network error in speech recognition', false);
-                break;
-            case 'aborted':
-                console.log('Speech recognition aborted, will restart if needed');
-                break;
-            case 'interrupted':
-                console.log('Speech recognition interrupted, will restart if needed');
-                break;
-            default:
-                console.error('Unknown speech recognition error:', event.error);
-                break;
-        }
-
-        // Ensure recognition state is properly reset on error
-        this.isRecognitionActive = false;
-
-        // Don't restart immediately on certain errors
-        if (['not-allowed', 'audio-capture'].includes(event.error)) {
-            this.continuousListening = false;
-            return;
-        }
-    }
-
-    handleSpeechEnd() {
-        this.isRecognitionActive = false;
-        
-        if (this.continuousListening) {
-            // Restart recognition after a short delay
-            this.restartTimeout = setTimeout(() => {
-                if (this.continuousListening && !this.isRecognitionActive) {
-                    this.startListening();
-                }
-            }, 1000);
-        } else {
-            this.updateStatus(this.t('clickToStart'), false);
-        }
-    }
-
-    startContinuousListening() {
-        this.continuousListening = true;
-        this.startListening();
-    }
-
-    stopContinuousListening() {
-        this.continuousListening = false;
-        this.clearTimeouts();
-        if (this.isRecognitionActive && this.recognition) {
-            this.recognition.stop();
-        }
-        this.updateStatus(this.t('clickToStart'), false);
-    }
-
-    startListening() {
-        if (!this.recognition) {
-            console.warn('Speech recognition not available');
-            this.updateStatus('Speech recognition not available', false);
-            return;
-        }
-
-        // If recognition is already active, don't start again
-        if (this.isRecognitionActive) {
-            console.log('Recognition already active, skipping start');
+    startSimpleListening() {
+        if (!this.recognition || this.isRecognitionActive) {
             return;
         }
 
         try {
-            // Update language if changed
             this.recognition.lang = this.currentLanguage === 'en' ? 'en-US' : 'hi-IN';
-            
-            console.log('Starting speech recognition...');
             this.recognition.start();
-            
         } catch (error) {
-            console.error('Error starting speech recognition:', error);
-            this.isRecognitionActive = false;
-            
-            // Try to restart after a delay if continuous listening is enabled
-            if (this.continuousListening) {
-                this.restartTimeout = setTimeout(() => {
-                    if (!this.isRecognitionActive) {
-                        this.startListening();
-                    }
-                }, 3000);
-            }
+            console.error('Error starting recognition:', error);
+            setTimeout(() => {
+                if (!this.isRecognitionActive && this.continuousListening) {
+                    this.startSimpleListening();
+                }
+            }, 3000);
         }
     }
 
-    clearTimeouts() {
-        if (this.recognitionTimeout) {
-            clearTimeout(this.recognitionTimeout);
-            this.recognitionTimeout = null;
-        }
-        if (this.restartTimeout) {
-            clearTimeout(this.restartTimeout);
-            this.restartTimeout = null;
-        }
-        if (this.silenceTimeout) {
-            clearTimeout(this.silenceTimeout);
-            this.silenceTimeout = null;
-        }
-    }
-
-    processVoiceCommand(command) {
-        console.log('Processing voice command:', command);
+    processSimpleVoiceCommand(command) {
+        console.log('Processing simple voice command:', command);
         
-        // Show processing status
-        this.updateStatus(this.t('processing'), true);
-        
-        // Stop current recognition to prevent interference
-        if (this.isRecognitionActive && this.recognition) {
-            this.continuousListening = false;
-            this.recognition.stop();
-        }
-        
-        // Define command mappings for both languages
+        // Basic command mappings
         const commands = {
             // English commands
-            'register user': () => this.showScreen('registration'),
             'register': () => this.showScreen('registration'),
             'registration': () => this.showScreen('registration'),
             'sign up': () => this.showScreen('registration'),
-            'create account': () => this.showScreen('registration'),
             
-            'register': () => this.showScreen('registration'),
-            'registration': () => this.showScreen('registration'),
             'login': () => this.showScreen('login'),
             'log in': () => this.showScreen('login'),
             'sign in': () => this.showScreen('login'),
             
             'home': () => this.showScreen('dashboard'),
             'dashboard': () => this.showScreen('dashboard'),
-            'main': () => this.showScreen('dashboard'),
-            
-            'settings': () => this.showScreen('settings'),
-            'preferences': () => this.showScreen('settings'),
-            'options': () => this.showScreen('settings'),
             
             'help': () => this.showScreen('help'),
-            'assistance': () => this.showScreen('help'),
-            'support': () => this.showScreen('help'),
             
             'logout': () => this.logout(),
             'log out': () => this.logout(),
             'sign out': () => this.logout(),
-            'exit': () => this.logout(),
-            
-            'back': () => this.goBack(),
-            'go back': () => this.goBack(),
-            'return': () => this.goBack(),
-            
-            'volume up': () => this.adjustVolume(0.1),
-            'volume down': () => this.adjustVolume(-0.1),
-            'increase volume': () => this.adjustVolume(0.1),
-            'decrease volume': () => this.adjustVolume(-0.1),
-            'louder': () => this.adjustVolume(0.1),
-            'quieter': () => this.adjustVolume(-0.1),
             
             // Hindi commands
-            'उपयोगकर्ता पंजीकरण': () => this.showScreen('registration'),
             'पंजीकरण': () => this.showScreen('registration'),
             'रजिस्टर': () => this.showScreen('registration'),
             
-            'लॉगिन करें': () => this.showScreen('login'),
             'लॉगिन': () => this.showScreen('login'),
             
             'होम': () => this.showScreen('dashboard'),
             'डैशबोर्ड': () => this.showScreen('dashboard'),
-            'मुख्य': () => this.showScreen('dashboard'),
-            
-            'सेटिंग्स': () => this.showScreen('settings'),
-            'विकल्प': () => this.showScreen('settings'),
             
             'सहायता': () => this.showScreen('help'),
             'मदद': () => this.showScreen('help'),
             
             'लॉगआउट': () => this.logout(),
-            'बाहर निकलें': () => this.logout(),
-            
-            'आवाज़ बढ़ाएं': () => this.adjustVolume(0.1),
-            'आवाज़ कम करें': () => this.adjustVolume(-0.1),
-            'वापस': () => this.goBack(),
         };
 
-        // Clean and normalize the command
-        const normalizedCommand = command.toLowerCase().trim();
-        
-        // Find exact match first
-        let commandFound = Object.keys(commands).find(cmd => 
-            cmd.toLowerCase() === normalizedCommand
-        );
-        
-        // If no exact match, try partial matches
-        if (!commandFound) {
-            let bestMatch = '';
-            let bestScore = 0;
-            
-            // Find the best matching command (contains match)
-            Object.keys(commands).forEach(cmd => {
-                if (normalizedCommand.includes(cmd.toLowerCase())) {
-                    if (cmd.length > bestScore) {
-                        commandFound = cmd;
-                        bestScore = cmd.length;
-                    }
-                }
-            });
+        // Find matching command
+        let commandFound = null;
+        for (const cmd in commands) {
+            if (command.includes(cmd.toLowerCase())) {
+                commandFound = cmd;
+                break;
+            }
         }
 
         if (commandFound && commands[commandFound]) {
             console.log('Executing command:', commandFound);
             try {
                 commands[commandFound]();
-                
-                // Provide audio feedback
-                const feedback = this.currentLanguage === 'en' ? 
-                    `Executing ${commandFound}` : 
-                    `${commandFound} निष्पादित कर रहे हैं`;
-                this.speak(feedback);
-                
+                this.speak(`Executing ${commandFound}`);
             } catch (error) {
                 console.error('Error executing command:', error);
-                this.speak(this.currentLanguage === 'en' ? 
-                    'Error executing command' : 
-                    'कमांड निष्पादित करने में त्रुटि'
-                );
+                this.speak('Error executing command');
             }
         } else {
             console.log('Command not recognized:', command);
-            this.speak(this.currentLanguage === 'en' ? 
-                `Sorry, I didn't understand "${command}". Try saying "help" for available commands.` :
-                `माफ़ करें, मैं "${command}" को समझ नहीं पाया। उपलब्ध कमांड के लिए "सहायता" कहें।`
-            );
-        }
-
-        // Restart listening after a short delay
-        setTimeout(() => {
-            this.continuousListening = true;
-            if (!this.isRecognitionActive) {
-                this.startListening();
-            }
-        }, 2000);
-    }
-
-    goBack() {
-        // Simple back navigation logic
-        if (this.currentScreen === 'dashboard') {
-            this.showScreen('welcome');
-        } else if (['settings', 'help'].includes(this.currentScreen)) {
-            this.showScreen('dashboard');
-        } else {
-            this.showScreen('welcome');
+            this.speak('Command not recognized. Try saying register, login, home, or help.');
         }
     }
 
@@ -541,29 +334,7 @@ class VaaniSewaApp {
         // Set voice
         if (this.selectedVoice && this.voices[this.selectedVoice]) {
             utterance.voice = this.voices[this.selectedVoice];
-        } else {
-            // Try to find a voice for current language
-            const langVoice = this.voices.find(voice => 
-                voice.lang.startsWith(this.currentLanguage)
-            );
-            if (langVoice) {
-                utterance.voice = langVoice;
-            }
         }
-
-        utterance.onstart = () => {
-            console.log('Speech synthesis started');
-            // Don't stop recognition while speaking to allow for immediate commands
-        };
-
-        utterance.onend = () => {
-            console.log('Speech synthesis ended');
-            // Recognition should continue automatically
-        };
-
-        utterance.onerror = (event) => {
-            console.error('Speech synthesis error:', event.error);
-        };
 
         try {
             this.synthesis.speak(utterance);
@@ -621,23 +392,38 @@ class VaaniSewaApp {
         const logoutBtn = document.getElementById('logoutBtn');
 
         if (registerBtn) {
-            registerBtn.addEventListener('click', () => this.showScreen('registration'));
+            registerBtn.addEventListener('click', () => {
+                console.log('Register button clicked');
+                this.showScreen('registration');
+            });
         }
         
         if (loginBtn) {
-            loginBtn.addEventListener('click', () => this.showScreen('login'));
+            loginBtn.addEventListener('click', () => {
+                console.log('Login button clicked');
+                this.showScreen('login');
+            });
         }
         
         if (settingsBtn) {
-            settingsBtn.addEventListener('click', () => this.showScreen('settings'));
+            settingsBtn.addEventListener('click', () => {
+                console.log('Settings button clicked');
+                this.showScreen('settings');
+            });
         }
         
         if (helpBtn) {
-            helpBtn.addEventListener('click', () => this.showScreen('help'));
+            helpBtn.addEventListener('click', () => {
+                console.log('Help button clicked');
+                this.showScreen('help');
+            });
         }
         
         if (logoutBtn) {
-            logoutBtn.addEventListener('click', () => this.logout());
+            logoutBtn.addEventListener('click', () => {
+                console.log('Logout button clicked');
+                this.logout();
+            });
         }
 
         // Back buttons
@@ -647,19 +433,31 @@ class VaaniSewaApp {
         const cancelLoginBtn = document.getElementById('cancelLoginBtn');
 
         if (backToDashboardBtn) {
-            backToDashboardBtn.addEventListener('click', () => this.showScreen('dashboard'));
+            backToDashboardBtn.addEventListener('click', () => {
+                console.log('Back to dashboard clicked');
+                this.showScreen('dashboard');
+            });
         }
         
         if (backFromHelpBtn) {
-            backFromHelpBtn.addEventListener('click', () => this.showScreen('welcome'));
+            backFromHelpBtn.addEventListener('click', () => {
+                console.log('Back from help clicked');
+                this.showScreen('welcome');
+            });
         }
         
         if (cancelRegBtn) {
-            cancelRegBtn.addEventListener('click', () => this.showScreen('welcome'));
+            cancelRegBtn.addEventListener('click', () => {
+                console.log('Cancel registration clicked');
+                this.showScreen('welcome');
+            });
         }
         
         if (cancelLoginBtn) {
-            cancelLoginBtn.addEventListener('click', () => this.showScreen('welcome'));
+            cancelLoginBtn.addEventListener('click', () => {
+                console.log('Cancel login clicked');
+                this.showScreen('welcome');
+            });
         }
 
         // Form submissions
@@ -669,6 +467,7 @@ class VaaniSewaApp {
         if (registrationForm) {
             registrationForm.addEventListener('submit', (e) => {
                 e.preventDefault();
+                console.log('Registration form submitted');
                 this.handleRegistration();
             });
         }
@@ -676,17 +475,10 @@ class VaaniSewaApp {
         if (loginForm) {
             loginForm.addEventListener('submit', (e) => {
                 e.preventDefault();
+                console.log('Login form submitted');
                 this.handleLogin();
             });
         }
-
-        // Voice input buttons
-        document.querySelectorAll('.mic-btn').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                const field = e.target.closest('.mic-btn').dataset.field;
-                this.handleVoiceInput(field);
-            });
-        });
 
         // Settings controls
         const speechRate = document.getElementById('speechRate');
@@ -697,14 +489,20 @@ class VaaniSewaApp {
         if (speechRate) {
             speechRate.addEventListener('input', (e) => {
                 this.speechRate = parseFloat(e.target.value);
-                document.getElementById('speechRateValue').textContent = this.speechRate.toFixed(1);
+                const valueSpan = document.getElementById('speechRateValue');
+                if (valueSpan) {
+                    valueSpan.textContent = this.speechRate.toFixed(1);
+                }
             });
         }
         
         if (speechPitch) {
             speechPitch.addEventListener('input', (e) => {
                 this.speechPitch = parseFloat(e.target.value);
-                document.getElementById('speechPitchValue').textContent = this.speechPitch.toFixed(1);
+                const valueSpan = document.getElementById('speechPitchValue');
+                if (valueSpan) {
+                    valueSpan.textContent = this.speechPitch.toFixed(1);
+                }
             });
         }
         
@@ -716,6 +514,7 @@ class VaaniSewaApp {
         
         if (testVoiceBtn) {
             testVoiceBtn.addEventListener('click', () => {
+                console.log('Test voice clicked');
                 this.speak('This is a test of your voice settings.');
             });
         }
@@ -725,134 +524,24 @@ class VaaniSewaApp {
         if (listeningStatus) {
             listeningStatus.addEventListener('click', () => {
                 if (this.isRecognitionActive) {
-                    this.stopContinuousListening();
+                    this.continuousListening = false;
+                    if (this.recognition) {
+                        this.recognition.stop();
+                    }
                     this.speak('Voice recognition stopped. Click again to restart.');
                 } else {
-                    this.startContinuousListening();
+                    this.continuousListening = true;
+                    this.startSimpleListening();
                     this.speak('Voice recognition started. You can now use voice commands.');
                 }
             });
         }
-
-        // Keyboard shortcuts
-        document.addEventListener('keydown', (e) => {
-            if (e.key === 'F1') {
-                e.preventDefault();
-                this.showScreen('help');
-            }
-        });
-    }
-
-    handleVoiceInput(field) {
-        if (!this.recognition) {
-            this.speak('Voice input not available');
-            return;
-        }
-
-        // Temporarily stop continuous listening
-        const wasContinuous = this.continuousListening;
-        this.stopContinuousListening();
-
-        // Create a temporary recognition instance for form input
-        const tempRecognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
-        tempRecognition.continuous = false;
-        tempRecognition.interimResults = false;
-        tempRecognition.lang = this.currentLanguage === 'en' ? 'en-US' : 'hi-IN';
-
-        const micBtn = document.querySelector(`[data-field="${field}"]`);
-        if (micBtn) {
-            micBtn.classList.add('listening');
-        }
-
-        tempRecognition.onresult = (event) => {
-            const transcript = event.results[0][0].transcript;
-            console.log('Voice input result:', transcript);
-            
-            // Fill the appropriate field
-            this.fillFormField(field, transcript);
-            
-            if (micBtn) {
-                micBtn.classList.remove('listening');
-            }
-            
-            // Resume continuous listening if it was active
-            if (wasContinuous) {
-                setTimeout(() => {
-                    this.startContinuousListening();
-                }, 1000);
-            }
-        };
-
-        tempRecognition.onerror = (event) => {
-            console.error('Voice input error:', event.error);
-            if (micBtn) {
-                micBtn.classList.remove('listening');
-            }
-            
-            // Resume continuous listening if it was active
-            if (wasContinuous) {
-                setTimeout(() => {
-                    this.startContinuousListening();
-                }, 1000);
-            }
-        };
-
-        tempRecognition.start();
-        this.speak('Please speak now');
-    }
-
-    fillFormField(field, value) {
-        let input;
-        
-        switch (field) {
-            case 'username':
-                input = document.getElementById('regUsername');
-                break;
-            case 'email':
-                input = document.getElementById('regEmail');
-                break;
-            case 'disability':
-                input = document.getElementById('regDisability');
-                // Map voice input to disability options
-                const disabilityMap = {
-                    'visual': 'visual',
-                    'sight': 'visual',
-                    'blind': 'visual',
-                    'hearing': 'hearing',
-                    'deaf': 'hearing',
-                    'mobility': 'mobility',
-                    'physical': 'mobility',
-                    'cognitive': 'cognitive',
-                    'mental': 'cognitive',
-                    'other': 'other'
-                };
-                
-                const disability = Object.keys(disabilityMap).find(key => 
-                    value.toLowerCase().includes(key)
-                );
-                
-                if (disability) {
-                    input.value = disabilityMap[disability];
-                }
-                return;
-            case 'loginUsername':
-                input = document.getElementById('loginUsername');
-                break;
-            default:
-                console.warn('Unknown field:', field);
-                return;
-        }
-        
-        if (input) {
-            input.value = value;
-            this.speak(`Field filled with: ${value}`);
-        }
     }
 
     handleRegistration() {
-        const username = document.getElementById('regUsername').value;
-        const email = document.getElementById('regEmail').value;
-        const disability = document.getElementById('regDisability').value;
+        const username = document.getElementById('regUsername')?.value;
+        const email = document.getElementById('regEmail')?.value;
+        const disability = document.getElementById('regDisability')?.value;
 
         if (!username || !email || !disability) {
             this.speak('Please fill in all required fields');
@@ -870,7 +559,7 @@ class VaaniSewaApp {
     }
 
     handleLogin() {
-        const username = document.getElementById('loginUsername').value;
+        const username = document.getElementById('loginUsername')?.value;
 
         if (!username) {
             this.speak('Please enter your username');
@@ -920,10 +609,7 @@ class VaaniSewaApp {
             }, 500);
         } else {
             console.error('Screen not found:', screenName);
-            this.speak(this.currentLanguage === 'en' ? 
-                'Screen not found' : 
-                'स्क्रीन नहीं मिली'
-            );
+            this.speak('Screen not found');
         }
     }
 
@@ -958,14 +644,6 @@ class VaaniSewaApp {
         if (langToggle) {
             langToggle.textContent = this.currentLanguage.toUpperCase();
         }
-
-        // Update all translatable elements
-        document.querySelectorAll('[data-translate]').forEach(element => {
-            const key = element.dataset.translate;
-            if (this.translations[this.currentLanguage][key]) {
-                element.textContent = this.translations[this.currentLanguage][key];
-            }
-        });
 
         // Update specific elements by ID
         const elements = {
