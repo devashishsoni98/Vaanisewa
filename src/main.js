@@ -279,6 +279,9 @@ class VaaniSewaApp {
                 break;
         }
 
+        // Ensure recognition state is properly reset on error
+        this.isRecognitionActive = false;
+
         // Don't restart immediately on certain errors
         if (['not-allowed', 'audio-capture'].includes(event.error)) {
             this.continuousListening = false;
@@ -322,7 +325,28 @@ class VaaniSewaApp {
         }
 
         if (this.isRecognitionActive) {
-            console.log('Recognition already active, skipping start');
+            console.log('Recognition already active, stopping first...');
+            this.recognition.stop();
+            this.isRecognitionActive = false;
+            
+            // Wait for the recognition to fully stop before starting again
+            setTimeout(() => {
+                this._startRecognitionInternal();
+            }, 100);
+            return;
+        }
+
+        this._startRecognitionInternal();
+    }
+
+    _startRecognitionInternal() {
+        if (!this.recognition) {
+            console.warn('Speech recognition not available');
+            return;
+        }
+
+        if (this.isRecognitionActive) {
+            console.log('Recognition still active, cannot start');
             return;
         }
 
@@ -347,7 +371,7 @@ class VaaniSewaApp {
             // Try to restart after a delay
             if (this.continuousListening) {
                 this.restartTimeout = setTimeout(() => {
-                    this.startListening();
+                    this._startRecognitionInternal();
                 }, 2000);
             }
         }
