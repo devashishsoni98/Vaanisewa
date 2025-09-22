@@ -439,11 +439,6 @@ class ContextualHelp {
                 content: 'Click this link to navigate to another page or section.',
                 voice: 'This is a link. Click to navigate to another page or section.'
             },
-            'h1': case 'h2': case 'h3': case 'h4': case 'h5': case 'h6': {
-                title: 'Heading',
-                content: 'This is a section heading that describes the content below.',
-                voice: 'This is a section heading describing the content that follows.'
-            },
             default: {
                 title: 'Interface Element',
                 content: 'This is an interactive element. Try clicking or using voice commands to interact with it.',
