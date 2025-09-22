@@ -13,6 +13,8 @@ class VaaniSewaApp {
         this.selectedVoice = null;
         this.voices = [];
         this.continuousListening = true;
+        this.isRecognitionActive = false;
+        this.recognitionRestartTimeout = null;
         this.voiceTimeout = null;
         
         // System components
@@ -258,6 +260,12 @@ class VaaniSewaApp {
     }
     
     async initializeVoiceRecognition() {
+        // Clear any existing recognition
+        if (this.recognition) {
+            this.recognition.abort();
+            this.recognition = null;
+        }
+        
         if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
             console.warn('Speech recognition not supported');
             this.showError('Voice recognition is not supported in this browser. Please use Chrome or Edge for the best experience.');
@@ -273,6 +281,7 @@ class VaaniSewaApp {
         this.recognition.maxAlternatives = 3;
         
         this.recognition.onstart = () => {
+            this.isRecognitionActive = true;
             this.isListening = true;
             this.updateListeningStatus();
             console.log('Voice recognition started');
@@ -291,6 +300,8 @@ class VaaniSewaApp {
         
         this.recognition.onerror = (event) => {
             console.error('Speech recognition error:', event.error);
+            this.isRecognitionActive = false;
+            this.isListening = false;
             
             if (event.error === 'not-allowed') {
                 this.showError('Microphone access denied. Please allow microphone access and refresh the page.');
@@ -299,15 +310,22 @@ class VaaniSewaApp {
                 if (this.continuousListening) {
                     setTimeout(() => this.startListening(), 1000);
                 }
+            } else if (event.error === 'aborted') {
+                // Handle aborted error gracefully - don't restart immediately
+                console.log('Speech recognition was aborted');
             } else {
-                this.showError(`Voice recognition error: ${event.error}`);
+                console.warn(`Voice recognition error: ${event.error}`);
+                // Try to restart after a longer delay for other errors
+                if (this.continuousListening) {
+                    setTimeout(() => this.startListening(), 2000);
+                }
             }
             
-            this.isListening = false;
             this.updateListeningStatus();
         };
         
         this.recognition.onend = () => {
+            this.isRecognitionActive = false;
             this.isListening = false;
             this.updateListeningStatus();
             
@@ -315,6 +333,12 @@ class VaaniSewaApp {
             if (this.continuousListening) {
                 setTimeout(() => this.startListening(), 500);
             }
+        };
+        
+        // Add abort handler
+        this.recognition.onabort = () => {
+            this.isRecognitionActive = false;
+            this.isListening = false;
         };
     }
     
@@ -487,19 +511,42 @@ class VaaniSewaApp {
     
     // Voice Recognition Methods
     startListening() {
-        if (!this.recognition || this.isListening) return;
+        // Clear any pending restart timeout
+        if (this.recognitionRestartTimeout) {
+            clearTimeout(this.recognitionRestartTimeout);
+            this.recognitionRestartTimeout = null;
+        }
+        
+        if (!this.recognition) {
+            console.warn('Speech recognition not initialized');
+            return;
+        }
+        
+        if (this.isRecognitionActive || this.isListening) {
+            console.log('Speech recognition already active');
+            return;
+        }
         
         try {
             this.recognition.lang = this.currentLanguage === 'hi' ? 'hi-IN' : 'en-US';
             this.recognition.start();
+            console.log('Starting speech recognition...');
         } catch (error) {
             console.error('Failed to start voice recognition:', error);
+            this.isRecognitionActive = false;
+            this.isListening = false;
         }
     }
     
     stopListening() {
         if (this.recognition && this.isListening) {
             this.recognition.stop();
+        }
+        
+        // Clear any pending restart timeout
+        if (this.recognitionRestartTimeout) {
+            clearTimeout(this.recognitionRestartTimeout);
+            this.recognitionRestartTimeout = null;
         }
     }
     
@@ -579,6 +626,12 @@ class VaaniSewaApp {
         // Stop continuous listening temporarily
         const wasListening = this.continuousListening;
         this.continuousListening = false;
+        
+        // Stop current recognition properly
+        if (this.recognition && this.isRecognitionActive) {
+            this.recognition.abort();
+        }
+        
         this.stopListening();
         
         // Create temporary recognition for form input
@@ -587,6 +640,7 @@ class VaaniSewaApp {
         tempRecognition.interimResults = false;
         tempRecognition.lang = this.currentLanguage === 'hi' ? 'hi-IN' : 'en-US';
         
+        let inputCompleted = false;
         tempRecognition.onresult = (event) => {
             const transcript = event.results[0][0].transcript.trim();
             
@@ -597,11 +651,12 @@ class VaaniSewaApp {
             }
             
             this.speak('Input recorded');
+            inputCompleted = true;
             
             // Restore continuous listening
             this.continuousListening = wasListening;
             if (this.continuousListening) {
-                setTimeout(() => this.startListening(), 1000);
+                this.recognitionRestartTimeout = setTimeout(() => this.startListening(), 1500);
             }
         };
         
@@ -612,13 +667,16 @@ class VaaniSewaApp {
             // Restore continuous listening
             this.continuousListening = wasListening;
             if (this.continuousListening) {
-                setTimeout(() => this.startListening(), 1000);
+                this.recognitionRestartTimeout = setTimeout(() => this.startListening(), 1500);
             }
         };
         
         tempRecognition.onend = () => {
             if (micBtn) {
                 micBtn.classList.remove('listening');
+            }
+            if (!inputCompleted && this.continuousListening) {
+                this.recognitionRestartTimeout = setTimeout(() => this.startListening(), 1500);
             }
         };
         
@@ -944,6 +1002,16 @@ class VaaniSewaApp {
             
             // Reset preferences to defaults
             this.resetToDefaults();
+        }
+    }
+    
+    // Cleanup method
+    cleanup() {
+        if (this.recognition) {
+            this.recognition.abort();
+        }
+        if (this.recognitionRestartTimeout) {
+            clearTimeout(this.recognitionRestartTimeout);
         }
     }
     
@@ -1333,6 +1401,13 @@ class VaaniSewaApp {
 // Initialize the application when DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
     window.vaaniSewaApp = new VaaniSewaApp();
+});
+
+// Cleanup on page unload
+window.addEventListener('beforeunload', () => {
+    if (window.vaaniSewaApp) {
+        window.vaaniSewaApp.cleanup();
+    }
 });
 
 // Export for global access
