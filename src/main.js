@@ -189,13 +189,13 @@ class VaaniSewaApp {
     async init() {
         try {
             // Initialize security first
-            this.security = new SecurityManager();
+            this.security = window.SecurityManager ? new SecurityManager() : null;
             
             // Initialize authentication system
-            this.auth = new AuthSystem();
+            this.auth = window.AuthSystem ? new AuthSystem() : this.createMockAuth();
             
             // Initialize data manager
-            this.dataManager = new DataManager(this.auth);
+            this.dataManager = window.DataManager ? new DataManager(this.auth) : null;
             
             // Set up voice recognition
             await this.initializeVoiceRecognition();
@@ -210,10 +210,10 @@ class VaaniSewaApp {
             this.initializeUI();
             
             // Initialize contextual help
-            this.contextualHelp = new ContextualHelp(this);
+            this.contextualHelp = window.ContextualHelp ? new ContextualHelp(this) : null;
             
             // Check if user needs onboarding
-            if (OnboardingWizard.shouldShowOnboarding()) {
+            if (window.OnboardingWizard && OnboardingWizard.shouldShowOnboarding()) {
                 this.onboardingWizard = new OnboardingWizard(this);
                 setTimeout(() => {
                     this.onboardingWizard.start();
@@ -235,6 +235,26 @@ class VaaniSewaApp {
             console.error('Failed to initialize VaaniSewa:', error);
             this.showError('Failed to initialize application. Please refresh the page.');
         }
+    }
+
+    createMockAuth() {
+        return {
+            currentUser: null,
+            login: (username) => {
+                this.currentUser = { username, role: 'student', id: Date.now().toString() };
+                return { success: true, user: this.currentUser };
+            },
+            logout: () => {
+                this.currentUser = null;
+                return { success: true };
+            },
+            getUsers: () => [],
+            updateUser: () => {},
+            logActivity: () => {},
+            getActivities: () => [],
+            loadSession: () => null,
+            updateLastActivity: () => {}
+        };
     }
     
     async initializeVoiceRecognition() {
@@ -436,7 +456,7 @@ class VaaniSewaApp {
         
         // Click tracking for activity
         document.addEventListener('click', () => {
-            if (this.auth?.currentUser) {
+            if (this.auth && this.auth.currentUser) {
                 this.auth.updateLastActivity();
             }
         });
@@ -453,13 +473,13 @@ class VaaniSewaApp {
         this.updateListeningStatus();
         
         // Load user preferences if logged in
-        if (this.auth?.currentUser?.preferences) {
+        if (this.auth && this.auth.currentUser && this.auth.currentUser.preferences) {
             this.applyUserPreferences(this.auth.currentUser.preferences);
         }
     }
     
     checkExistingSession() {
-        const session = this.auth?.loadSession();
+        const session = this.auth && this.auth.loadSession ? this.auth.loadSession() : null;
         if (session && session.user) {
             this.handleSuccessfulLogin(session.user);
         }
@@ -488,7 +508,7 @@ class VaaniSewaApp {
         const command = transcript.toLowerCase().trim();
         
         // Log voice command activity
-        if (this.auth?.currentUser) {
+        if (this.auth && this.auth.currentUser) {
             this.auth.logActivity('voice_command', { command, language: this.currentLanguage });
         }
         
@@ -752,7 +772,7 @@ class VaaniSewaApp {
     }
     
     goHome() {
-        if (this.auth?.currentUser) {
+        if (this.auth && this.auth.currentUser) {
             const role = this.auth.currentUser.role;
             if (role === 'admin' || role === 'institution_admin') {
                 this.showAdminDashboard();
@@ -778,13 +798,13 @@ class VaaniSewaApp {
         const form = document.getElementById('registrationForm');
         const formData = new FormData(form);
         
-        const username = this.security.sanitizeInput(formData.get('username'));
-        const email = this.security.sanitizeInput(formData.get('email'));
+        const username = this.security ? this.security.sanitizeInput(formData.get('username')) : formData.get('username');
+        const email = this.security ? this.security.sanitizeInput(formData.get('email')) : formData.get('email');
         const disability = formData.get('disability');
         
         // Validate inputs
-        const usernameValidation = this.security.validateUsername(username);
-        const emailValidation = this.security.validateEmail(email);
+        const usernameValidation = this.security ? this.security.validateUsername(username) : { isValid: true, value: username };
+        const emailValidation = this.security ? this.security.validateEmail(email) : { isValid: true, value: email };
         
         if (!usernameValidation.isValid) {
             this.speak(usernameValidation.error);
@@ -802,7 +822,7 @@ class VaaniSewaApp {
         }
         
         // Check if user already exists
-        const existingUsers = this.auth.getUsers();
+        const existingUsers = this.auth ? this.auth.getUsers() : [];
         if (existingUsers.find(u => u.username === username)) {
             this.speak('Username already exists. Please choose a different username.');
             return;
@@ -838,15 +858,19 @@ class VaaniSewaApp {
         };
         
         // Save user
-        existingUsers.push(newUser);
-        localStorage.setItem('vaanisewa-users', JSON.stringify(existingUsers));
+        if (this.auth && this.auth.getUsers) {
+            existingUsers.push(newUser);
+            localStorage.setItem('vaanisewa-users', JSON.stringify(existingUsers));
+        }
         
         // Log activity
-        this.auth.logActivity('user_registered', { 
+        if (this.auth && this.auth.logActivity) {
+            this.auth.logActivity('user_registered', { 
             username: newUser.username, 
             email: newUser.email,
             disability: newUser.disability 
-        });
+            });
+        }
         
         this.speak('Registration successful! You can now login with your username.');
         form.reset();
@@ -856,7 +880,7 @@ class VaaniSewaApp {
     async handleLogin() {
         const form = document.getElementById('loginForm');
         const formData = new FormData(form);
-        const username = this.security.sanitizeInput(formData.get('username'));
+        const username = this.security ? this.security.sanitizeInput(formData.get('username')) : formData.get('username');
         
         if (!username) {
             this.speak('Please enter your username');
@@ -864,7 +888,7 @@ class VaaniSewaApp {
         }
         
         // Check account lockout
-        const lockStatus = this.security.isAccountLocked(username);
+        const lockStatus = this.security ? this.security.isAccountLocked(username) : { isLocked: false };
         if (lockStatus.isLocked) {
             const remainingTime = Math.ceil(lockStatus.remainingTime / 60000);
             this.speak(`Account is locked. Please try again in ${remainingTime} minutes.`);
@@ -875,7 +899,7 @@ class VaaniSewaApp {
         const result = this.auth.login(username);
         
         // Track login attempt
-        this.security.trackLoginAttempt(username, result.success);
+        if (this.security) this.security.trackLoginAttempt(username, result.success);
         
         if (result.success) {
             this.handleSuccessfulLogin(result.user);
@@ -894,10 +918,10 @@ class VaaniSewaApp {
         
         // Initialize role-specific dashboards
         if (user.role === 'admin' || user.role === 'institution_admin') {
-            this.adminDashboard = new AdminDashboard(this.auth);
+            this.adminDashboard = window.AdminDashboard ? new AdminDashboard(this.auth) : null;
             this.showAdminDashboard();
         } else {
-            this.userDashboard = new UserDashboard(this.auth);
+            this.userDashboard = window.UserDashboard ? new UserDashboard(this.auth) : null;
             this.showUserDashboard();
         }
         
@@ -906,7 +930,7 @@ class VaaniSewaApp {
     }
     
     logout() {
-        if (this.auth?.currentUser) {
+        if (this.auth && this.auth.currentUser) {
             const username = this.auth.currentUser.username;
             this.auth.logout();
             this.speak(`Goodbye, ${username}!`);
@@ -931,14 +955,14 @@ class VaaniSewaApp {
     // Dashboard Methods
     showAdminDashboard() {
         if (!this.adminDashboard) {
-            this.adminDashboard = new AdminDashboard(this.auth);
+            this.adminDashboard = window.AdminDashboard ? new AdminDashboard(this.auth) : null;
         }
         this.showScreen('adminDashboard');
     }
     
     showUserDashboard() {
         if (!this.userDashboard) {
-            this.userDashboard = new UserDashboard(this.auth);
+            this.userDashboard = window.UserDashboard ? new UserDashboard(this.auth) : null;
         }
         this.showScreen('userDashboard');
     }
@@ -974,7 +998,7 @@ class VaaniSewaApp {
         }
         
         // Save preference if user is logged in
-        if (this.auth?.currentUser) {
+        if (this.auth && this.auth.currentUser) {
             const updatedUser = {
                 ...this.auth.currentUser,
                 preferences: {
@@ -1022,7 +1046,7 @@ class VaaniSewaApp {
         this.updateVolumeIndicator();
         
         // Save preference if user is logged in
-        if (this.auth?.currentUser) {
+        if (this.auth && this.auth.currentUser) {
             const updatedUser = {
                 ...this.auth.currentUser,
                 preferences: {
@@ -1064,7 +1088,7 @@ class VaaniSewaApp {
     }
     
     saveAccessibilityPreference(key, value) {
-        if (this.auth?.currentUser) {
+        if (this.auth && this.auth.currentUser) {
             const updatedUser = {
                 ...this.auth.currentUser,
                 preferences: {
@@ -1187,7 +1211,7 @@ class VaaniSewaApp {
         
         // Update UI controls
         this.updateVolumeIndicator();
-        
+        if (!document.getElementById('speechRate')) return;
         const speechRateSlider = document.getElementById('speechRate');
         const speechPitchSlider = document.getElementById('speechPitch');
         
@@ -1227,11 +1251,11 @@ class VaaniSewaApp {
         switch (event.key) {
             case 'F1':
                 event.preventDefault();
-                this.toggleHelpMode();
+                if (this.contextualHelp) this.contextualHelp.toggleHelpMode();
                 break;
             case 'Escape':
-                if (this.contextualHelp?.isActive) {
-                    this.contextualHelp.exitHelpMode();
+                if (this.contextualHelp && this.contextualHelp.isActive) {
+                    if (this.contextualHelp.exitHelpMode) this.contextualHelp.exitHelpMode();
                 } else {
                     this.goBack();
                 }
