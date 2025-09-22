@@ -444,42 +444,21 @@ class ContextualHelp {
                 content: 'This is a section heading that describes the content below.',
                 voice: 'This is a section heading describing the content that follows.'
             },
-            'h1': {
-                title: 'Heading',
-                content: 'This is a section heading that describes the content below.',
-                voice: 'This is a section heading describing the content that follows.'
-            },
-            'h2': {
-                title: 'Heading',
-                content: 'This is a section heading that describes the content below.',
-                voice: 'This is a section heading describing the content that follows.'
-            },
-            'h3': {
-                title: 'Heading',
-                content: 'This is a section heading that describes the content below.',
-                voice: 'This is a section heading describing the content that follows.'
-            },
-            'h4': {
-                title: 'Heading',
-                content: 'This is a section heading that describes the content below.',
-                voice: 'This is a section heading describing the content that follows.'
-            },
-            'h5': {
-                title: 'Heading',
-                content: 'This is a section heading that describes the content below.',
-                voice: 'This is a section heading describing the content that follows.'
-            },
-            'h6': {
-                title: 'Heading',
-                content: 'This is a section heading that describes the content below.',
-                voice: 'This is a section heading describing the content that follows.'
-            },
             default: {
                 title: 'Interface Element',
                 content: 'This is an interactive element. Try clicking or using voice commands to interact with it.',
                 voice: 'This is an interface element. Try clicking or using voice commands to interact.'
             }
         };
+        
+        // Check if it's a heading tag
+        if (['h1', 'h2', 'h3', 'h4', 'h5', 'h6'].includes(tagName)) {
+            return {
+                title: 'Heading',
+                content: 'This is a section heading that describes the content below.',
+                voice: 'This is a section heading describing the content that follows.'
+            };
+        }
         
         return genericHelp[tagName] || genericHelp.default;
     }

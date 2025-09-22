@@ -387,9 +387,10 @@ class VaaniSewaApp {
                     this.speak(this.translations[this.currentLanguage].microphoneError);
                 } else if (event.error === 'no-speech') {
                     console.log('No speech detected, continuing...');
+                } else if (event.error === 'aborted') {
+                    console.log('Speech recognition aborted, will restart via onend handler');
                 } else if (event.error === 'network') {
-                    console.log('Network error, retrying...');
-                    setTimeout(() => this.startListening(), 2000);
+                    console.log('Network error, will restart via onend handler');
                 }
             };
         } else {
