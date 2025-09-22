@@ -327,12 +327,6 @@ class VaaniSewaApp {
         if (this.isRecognitionActive) {
             console.log('Recognition already active, stopping first...');
             this.recognition.stop();
-            this.isRecognitionActive = false;
-            
-            // Wait for the recognition to fully stop before starting again
-            setTimeout(() => {
-                this._startRecognitionInternal();
-            }, 100);
             return;
         }
 
