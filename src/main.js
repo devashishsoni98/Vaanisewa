@@ -203,7 +203,8 @@ class VaaniSewaApp {
                 console.log('Voice recognition started');
                 this.isRecognitionActive = true;
                 this.isListening = true;
-                this.updateStatus(this.t('listening'), true);
+                const listeningMessage = this.currentLanguage === 'en' ? 'Listening...' : 'सुन रहा है...';
+                this.updateStatus(listeningMessage, true);
             };
 
             this.recognition.onresult = (event) => {
@@ -222,45 +223,66 @@ class VaaniSewaApp {
                 
                 // Don't restart on certain errors
                 if (['not-allowed', 'audio-capture'].includes(event.error)) {
-                    this.updateStatus('Microphone access denied', false);
+                    const errorMessage = this.currentLanguage === 'en' ? 
+                        'Microphone access denied' : 
+                        'माइक्रोफोन एक्सेस अस्वीकृत';
+                    this.updateStatus(errorMessage, false);
                     return;
                 }
                 
-                this.updateStatus('Voice recognition error', false);
+                const errorMessage = this.currentLanguage === 'en' ? 
+                    'Voice recognition error' : 
+                    'आवाज़ पहचान त्रुटि';
+                this.updateStatus(errorMessage, false);
             };
 
             this.recognition.onend = () => {
                 console.log('Voice recognition ended');
                 this.isRecognitionActive = false;
                 this.isListening = false;
-                this.updateStatus('Click to start listening', false);
+                const statusMessage = this.currentLanguage === 'en' ? 
+                    'Click to start listening' : 
+                    'सुनना शुरू करने के लिए क्लिक करें';
+                this.updateStatus(statusMessage, false);
             };
 
             // Initial status
-            this.updateStatus('Click to start listening', false);
+            const initialMessage = this.currentLanguage === 'en' ? 
+                'Click to start listening' : 
+                'सुनना शुरू करने के लिए क्लिक करें';
+            this.updateStatus(initialMessage, false);
             
         } catch (error) {
             console.error('Error initializing voice recognition:', error);
-            this.updateStatus('Voice recognition initialization failed', false);
+            const errorMessage = this.currentLanguage === 'en' ? 
+                'Voice recognition initialization failed' : 
+                'आवाज़ पहचान प्रारंभीकरण असफल';
+            this.updateStatus(errorMessage, false);
         }
     }
 
     startListening() {
         if (!this.recognition || this.isRecognitionActive) {
+            console.log('Cannot start listening - recognition not available or already active');
             return;
         }
 
         try {
+            console.log('Starting voice recognition...');
             this.recognition.lang = this.currentLanguage === 'en' ? 'en-US' : 'hi-IN';
             this.recognition.start();
         } catch (error) {
             console.error('Error starting recognition:', error);
-            this.updateStatus('Error starting voice recognition', false);
+            const errorMessage = this.currentLanguage === 'en' ? 
+                'Error starting voice recognition' : 
+                'आवाज़ पहचान शुरू करने में त्रुटि';
+            this.updateStatus(errorMessage, false);
         }
     }
 
     stopListening() {
         if (this.recognition && this.isRecognitionActive) {
+            console.log('Stopping voice recognition...');
             this.recognition.stop();
         }
     }
@@ -271,47 +293,156 @@ class VaaniSewaApp {
         // Basic command mappings
         const commands = {
             // English commands
-            'register': () => this.showScreen('registration'),
-            'registration': () => this.showScreen('registration'),
-            'sign up': () => this.showScreen('registration'),
+            'register': () => {
+                console.log('Voice command: register');
+                this.showScreen('registration');
+            },
+            'register user': () => {
+                console.log('Voice command: register user');
+                this.showScreen('registration');
+            },
+            'registration': () => {
+                console.log('Voice command: registration');
+                this.showScreen('registration');
+            },
+            'sign up': () => {
+                console.log('Voice command: sign up');
+                this.showScreen('registration');
+            },
             
-            'login': () => this.showScreen('login'),
-            'log in': () => this.showScreen('login'),
-            'sign in': () => this.showScreen('login'),
+            'login': () => {
+                console.log('Voice command: login');
+                this.showScreen('login');
+            },
+            'log in': () => {
+                console.log('Voice command: log in');
+                this.showScreen('login');
+            },
+            'sign in': () => {
+                console.log('Voice command: sign in');
+                this.showScreen('login');
+            },
             
-            'home': () => this.showScreen('dashboard'),
-            'dashboard': () => this.showScreen('dashboard'),
-            'analytics': () => this.showUserAnalytics(),
+            'home': () => {
+                console.log('Voice command: home');
+                if (this.currentUser) {
+                    this.showUserAnalytics();
+                } else {
+                    this.showScreen('welcome');
+                }
+            },
+            'dashboard': () => {
+                console.log('Voice command: dashboard');
+                if (this.currentUser) {
+                    this.showUserAnalytics();
+                } else {
+                    this.showScreen('dashboard');
+                }
+            },
+            'analytics': () => {
+                console.log('Voice command: analytics');
+                this.showUserAnalytics();
+            },
             
-            'help': () => this.showScreen('help'),
+            'help': () => {
+                console.log('Voice command: help');
+                this.showScreen('help');
+            },
             
-            'logout': () => this.logout(),
-            'log out': () => this.logout(),
-            'sign out': () => this.logout(),
+            'logout': () => {
+                console.log('Voice command: logout');
+                this.logout();
+            },
+            'log out': () => {
+                console.log('Voice command: log out');
+                this.logout();
+            },
+            'sign out': () => {
+                console.log('Voice command: sign out');
+                this.logout();
+            },
             
-            'settings': () => this.showScreen('settings'),
+            'settings': () => {
+                console.log('Voice command: settings');
+                this.showScreen('settings');
+            },
             
-            'volume up': () => this.adjustVolume(0.1),
-            'volume down': () => this.adjustVolume(-0.1),
+            'volume up': () => {
+                console.log('Voice command: volume up');
+                this.adjustVolume(0.1);
+            },
+            'volume down': () => {
+                console.log('Voice command: volume down');
+                this.adjustVolume(-0.1);
+            },
             
             // Hindi commands
-            'पंजीकरण': () => this.showScreen('registration'),
-            'रजिस्टर': () => this.showScreen('registration'),
+            'पंजीकरण': () => {
+                console.log('Voice command: पंजीकरण');
+                this.showScreen('registration');
+            },
+            'उपयोगकर्ता पंजीकरण': () => {
+                console.log('Voice command: उपयोगकर्ता पंजीकरण');
+                this.showScreen('registration');
+            },
+            'रजिस्टर': () => {
+                console.log('Voice command: रजिस्टर');
+                this.showScreen('registration');
+            },
             
-            'लॉगिन': () => this.showScreen('login'),
+            'लॉगिन': () => {
+                console.log('Voice command: लॉगिन');
+                this.showScreen('login');
+            },
+            'लॉगिन करें': () => {
+                console.log('Voice command: लॉगिन करें');
+                this.showScreen('login');
+            },
             
-            'होम': () => this.showScreen('dashboard'),
-            'डैशबोर्ड': () => this.showScreen('dashboard'),
+            'होम': () => {
+                console.log('Voice command: होम');
+                if (this.currentUser) {
+                    this.showUserAnalytics();
+                } else {
+                    this.showScreen('welcome');
+                }
+            },
+            'डैशबोर्ड': () => {
+                console.log('Voice command: डैशबोर्ड');
+                if (this.currentUser) {
+                    this.showUserAnalytics();
+                } else {
+                    this.showScreen('dashboard');
+                }
+            },
             
-            'सहायता': () => this.showScreen('help'),
-            'मदद': () => this.showScreen('help'),
+            'सहायता': () => {
+                console.log('Voice command: सहायता');
+                this.showScreen('help');
+            },
+            'मदद': () => {
+                console.log('Voice command: मदद');
+                this.showScreen('help');
+            },
             
-            'लॉगआउट': () => this.logout(),
+            'लॉगआउट': () => {
+                console.log('Voice command: लॉगआउट');
+                this.logout();
+            },
             
-            'सेटिंग्स': () => this.showScreen('settings'),
+            'सेटिंग्स': () => {
+                console.log('Voice command: सेटिंग्स');
+                this.showScreen('settings');
+            },
             
-            'आवाज़ बढ़ाएं': () => this.adjustVolume(0.1),
-            'आवाज़ कम करें': () => this.adjustVolume(-0.1),
+            'आवाज़ बढ़ाएं': () => {
+                console.log('Voice command: आवाज़ बढ़ाएं');
+                this.adjustVolume(0.1);
+            },
+            'आवाज़ कम करें': () => {
+                console.log('Voice command: आवाज़ कम करें');
+                this.adjustVolume(-0.1);
+            },
         };
 
         // Find matching command
@@ -327,7 +458,34 @@ class VaaniSewaApp {
             console.log('Executing command:', commandFound);
             try {
                 commands[commandFound]();
-                this.speak(`Command executed: ${commandFound}`);
+                
+                // Provide appropriate voice feedback
+                const feedbackMessages = {
+                    'register': 'Opening registration form',
+                    'register user': 'Opening registration form',
+                    'login': 'Opening login form',
+                    'home': 'Going to home screen',
+                    'dashboard': 'Opening dashboard',
+                    'help': 'Opening help screen',
+                    'settings': 'Opening settings',
+                    'logout': 'Logging out',
+                    'volume up': 'Volume increased',
+                    'volume down': 'Volume decreased',
+                    'पंजीकरण': 'पंजीकरण फॉर्म खोल रहे हैं',
+                    'उपयोगकर्ता पंजीकरण': 'पंजीकरण फॉर्म खोल रहे हैं',
+                    'लॉगिन': 'लॉगिन फॉर्म खोल रहे हैं',
+                    'लॉगिन करें': 'लॉगिन फॉर्म खोल रहे हैं',
+                    'होम': 'होम स्क्रीन पर जा रहे हैं',
+                    'डैशबोर्ड': 'डैशबोर्ड खोल रहे हैं',
+                    'सहायता': 'सहायता स्क्रीन खोल रहे हैं',
+                    'सेटिंग्स': 'सेटिंग्स खोल रहे हैं',
+                    'लॉगआउट': 'लॉगआउट कर रहे हैं',
+                    'आवाज़ बढ़ाएं': 'आवाज़ बढ़ाई गई',
+                    'आवाज़ कम करें': 'आवाज़ कम की गई'
+                };
+                
+                const feedback = feedbackMessages[commandFound] || `Command executed: ${commandFound}`;
+                this.speak(feedback);
                 
                 // Log activity if user is logged in
                 if (this.currentUser && this.authSystem) {
@@ -339,7 +497,10 @@ class VaaniSewaApp {
             }
         } else {
             console.log('Command not recognized:', command);
-            this.speak('Command not recognized. Try saying register, login, home, or help.');
+            const helpMessage = this.currentLanguage === 'en' ? 
+                'Command not recognized. Try saying register, login, home, help, or settings.' :
+                'कमांड समझ नहीं आया। कहें पंजीकरण, लॉगिन, होम, सहायता, या सेटिंग्स।';
+            this.speak(helpMessage);
         }
     }
 
@@ -407,6 +568,22 @@ class VaaniSewaApp {
         
         if (volumeDown) {
             volumeDown.addEventListener('click', () => this.adjustVolume(-0.1));
+        }
+
+        // Voice control buttons
+        const startVoiceBtn = document.getElementById('startVoiceBtn');
+        const stopVoiceBtn = document.getElementById('stopVoiceBtn');
+        
+        if (startVoiceBtn) {
+            startVoiceBtn.addEventListener('click', () => {
+                this.startListening();
+            });
+        }
+        
+        if (stopVoiceBtn) {
+            stopVoiceBtn.addEventListener('click', () => {
+                this.stopListening();
+            });
         }
 
         // Navigation buttons
@@ -581,8 +758,11 @@ class VaaniSewaApp {
             return;
         }
         
+        console.log('Starting voice input for field:', fieldName);
         button.classList.add('listening');
-        this.speak('Speak now');
+        
+        const speakMessage = this.currentLanguage === 'en' ? 'Speak now' : 'अब बोलें';
+        this.speak(speakMessage);
         
         const tempRecognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
         tempRecognition.continuous = false;
@@ -591,9 +771,13 @@ class VaaniSewaApp {
         
         tempRecognition.onresult = (event) => {
             const transcript = event.results[0][0].transcript;
+            console.log('Voice input received:', transcript);
+            
             const targetInput = document.getElementById(fieldName) || 
+                              document.querySelector(`[name="${fieldName}"]`) ||
                               document.querySelector(`input[data-field="${fieldName}"]`) ||
-                              document.querySelector(`select[data-field="${fieldName}"]`);
+                              document.querySelector(`select[data-field="${fieldName}"]`) ||
+                              document.getElementById(fieldName.replace('reg', '').replace('login', ''));
             
             if (targetInput) {
                 if (targetInput.tagName === 'SELECT') {
@@ -605,25 +789,51 @@ class VaaniSewaApp {
                     );
                     if (matchedOption) {
                         targetInput.value = matchedOption.value;
+                        console.log('Selected option:', matchedOption.value);
                     }
                 } else {
                     targetInput.value = transcript;
+                    console.log('Set input value:', transcript);
                 }
-                this.speak(`Entered: ${transcript}`);
+                
+                const confirmMessage = this.currentLanguage === 'en' ? 
+                    `Entered: ${transcript}` : 
+                    `दर्ज किया गया: ${transcript}`;
+                this.speak(confirmMessage);
+            } else {
+                console.error('Target input not found for field:', fieldName);
+                const errorMessage = this.currentLanguage === 'en' ? 
+                    'Input field not found' : 
+                    'इनपुट फील्ड नहीं मिला';
+                this.speak(errorMessage);
             }
             button.classList.remove('listening');
         };
         
-        tempRecognition.onerror = () => {
+        tempRecognition.onerror = (event) => {
+            console.error('Voice input error:', event.error);
             button.classList.remove('listening');
-            this.speak('Voice input failed');
+            const errorMessage = this.currentLanguage === 'en' ? 
+                'Voice input failed' : 
+                'आवाज़ इनपुट असफल';
+            this.speak(errorMessage);
         };
         
         tempRecognition.onend = () => {
+            console.log('Voice input ended');
             button.classList.remove('listening');
         };
         
-        tempRecognition.start();
+        try {
+            tempRecognition.start();
+        } catch (error) {
+            console.error('Error starting voice input:', error);
+            button.classList.remove('listening');
+            const errorMessage = this.currentLanguage === 'en' ? 
+                'Could not start voice input' : 
+                'आवाज़ इनपुट शुरू नहीं हो सका';
+            this.speak(errorMessage);
+        }
     }
 
     handleRegistration() {
@@ -656,7 +866,10 @@ class VaaniSewaApp {
         const username = document.getElementById('loginUsername')?.value;
 
         if (!username) {
-            this.speak('Please enter your username');
+            const message = this.currentLanguage === 'en' ? 
+                'Please enter your username' : 
+                'कृपया अपना उपयोगकर्ता नाम दर्ज करें';
+            this.speak(message);
             return;
         }
 
@@ -666,13 +879,19 @@ class VaaniSewaApp {
         const result = this.authSystem.login(username);
         if (result.success) {
             this.currentUser = result.user;
-            this.speak(`Welcome back, ${username}!`);
+            const welcomeMessage = this.currentLanguage === 'en' ? 
+                `Welcome back, ${username}!` : 
+                `वापसी पर स्वागत, ${username}!`;
+            this.speak(welcomeMessage);
             
             setTimeout(() => {
                 this.showUserAnalytics();
             }, 2000);
         } else {
-            this.speak('Login failed. Please check your username.');
+            const errorMessage = this.currentLanguage === 'en' ? 
+                'Login failed. Please check your username.' : 
+                'लॉगिन असफल। कृपया अपना उपयोगकर्ता नाम जांचें।';
+            this.speak(errorMessage);
         }
     }
     
@@ -700,8 +919,14 @@ class VaaniSewaApp {
             screen.classList.remove('active');
         });
 
-        // Show target screen
-        const targetScreen = document.getElementById(`${screenName}Screen`);
+        // Handle special case for user dashboard
+        let targetScreen;
+        if (screenName === 'userDashboard') {
+            targetScreen = document.getElementById('userDashboard');
+        } else {
+            targetScreen = document.getElementById(`${screenName}Screen`);
+        }
+        
         if (targetScreen) {
             targetScreen.classList.add('active');
             this.currentScreen = screenName;
@@ -712,21 +937,38 @@ class VaaniSewaApp {
                 registration: 'Registration screen',
                 login: 'Login screen',
                 dashboard: 'Dashboard',
+                userDashboard: 'User Dashboard',
                 settings: 'Settings',
                 help: 'Help screen'
             };
             
             const announcement = this.currentLanguage === 'en' ? 
                 `Navigated to ${screenTitles[screenName] || screenName}` :
-                `${screenTitles[screenName] || screenName} पर पहुंचे`;
+                `${this.getHindiScreenTitle(screenName)} पर पहुंचे`;
             
             setTimeout(() => {
                 this.speak(announcement);
             }, 500);
         } else {
             console.error('Screen not found:', screenName);
-            this.speak('Screen not found');
+            const errorMessage = this.currentLanguage === 'en' ? 
+                'Screen not found' : 
+                'स्क्रीन नहीं मिली';
+            this.speak(errorMessage);
         }
+    }
+    
+    getHindiScreenTitle(screenName) {
+        const hindiTitles = {
+            welcome: 'स्वागत स्क्रीन',
+            registration: 'पंजीकरण स्क्रीन',
+            login: 'लॉगिन स्क्रीन',
+            dashboard: 'डैशबोर्ड',
+            userDashboard: 'उपयोगकर्ता डैशबोर्ड',
+            settings: 'सेटिंग्स',
+            help: 'सहायता स्क्रीन'
+        };
+        return hindiTitles[screenName] || screenName;
     }
 
     logout() {
